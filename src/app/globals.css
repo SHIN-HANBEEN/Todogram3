@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+@import './theme.css';
+@import './typography.css';
+
+@plugin '@tailwindcss/typography';
+@plugin 'tailwindcss-animate';
+@plugin 'tailwindcss-react-aria-components';
+
+/* UntitledUI dark mode: .dark-mode 클래스 기반 */
+@custom-variant dark (&:where(.dark-mode, .dark-mode *));
+@custom-variant label (& [data-label]);
+@custom-variant focus-input-within (&:has(input:focus));
+
+@utility scrollbar-hide {
+  /* Webkit (Chrome, Safari, Opera) */
+  &::-webkit-scrollbar {
+    display: none;
+    -webkit-appearance: none;
+  }
+  /* IE, Edge, Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@utility transition-inherit-all {
+  transition-property: inherit;
+  transition-duration: inherit;
+  transition-timing-function: inherit;
+}
+
+html,
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-variant-ligatures: contextual;
+  font-variant-ligatures: contextual;
+  -webkit-font-kerning: normal;
+  font-kerning: normal;
+}
+
+/* Safari의 기본 확장 화살표 숨김 */
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+/* number input 기본 화살표 숨김 */
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Firefox */
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* search input 기본 X 버튼 숨김 */
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* recharts 차트 요소의 기본 outline 숨김 */
+.recharts-surface,
+.recharts-surface g,
+.recharts-surface path {
+  outline: none;
+}
