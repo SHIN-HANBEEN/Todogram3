@@ -1,0 +1,38 @@
+{
+  "date": "2026-04-14",
+  "window": "7d",
+  "metrics": {
+    "commits": 3,
+    "contributors": 1,
+    "prs_merged": 0,
+    "insertions": 228456,
+    "deletions": 0,
+    "net_loc": 228456,
+    "test_loc": 0,
+    "test_ratio": 0,
+    "active_days": 1,
+    "sessions": 1,
+    "deep_sessions": 0,
+    "avg_session_minutes": 8,
+    "loc_per_session_hour": 0,
+    "feat_pct": 0,
+    "fix_pct": 0,
+    "chore_pct": 1.0,
+    "peak_hour": 22,
+    "ai_assisted_commits": 0,
+    "note": "All commits are starter kit import/merge operations on repo init night. No engineering work. Real deliverable this week is an untracked design doc at docs/design/todogram-v2-design.md (Todogram v2 APPROVED)."
+  },
+  "authors": {
+    "SHIN-HANBEEN": {
+      "commits": 3,
+      "insertions": 228456,
+      "deletions": 0,
+      "test_ratio": 0,
+      "top_area": "(starter kit import)"
+    }
+  },
+  "version_range": null,
+  "streak_days": 1,
+  "personal_streak_days": 1,
+  "tweetable": "Week of Apr 7-13: 3 commits (repo init only), 0 features | Real work: Todogram v2 thesis pivot via /office-hours, design doc APPROVED | Streak: 1d"
+}
