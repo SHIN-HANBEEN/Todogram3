@@ -352,3 +352,23 @@ npm run build       # 빌드 성공 확인
 | `text-fg-brand-primary` | 브랜드 아이콘 |
 
 💡 **상세 규칙은 위 개발 가이드 문서들을 참조하세요**
+
+---
+
+## 🎨 Design System (Quiet Layer)
+
+**항상 UI/시각 관련 결정을 내리기 전에 `docs/design/DESIGN.md`를 먼저 읽습니다.**
+
+- 폰트, 색상, 간격, 모서리, 모션, 레이어드 위계 — 모두 `docs/design/DESIGN.md`에 정의됨
+- 본 문서의 "🎨 색상 토큰 빠른 참조"는 UntitledUI 스타터 기본값 기준. **`docs/design/DESIGN.md`가 우선합니다.**
+- 새 컴포넌트/화면을 작성할 때 `docs/design/DESIGN.md § 9 Hard Rules` 를 위반하지 말 것
+- 주요 제약:
+  - Violet/purple 브랜드 색상 금지 (Sage green `#3A6E5B` 사용)
+  - Inter/Noto Sans KR 금지 (Pretendard Variable 사용)
+  - 본문에 Instrument Serif / system font 금지 (display/moments에만)
+  - 그라디언트 브랜드 색상 금지 (solid만)
+  - 태스크 완료 시 컨페티/사운드 금지 (생산성 게이미피케이션 배척)
+  - 터치 타겟 48px 이상
+- QA·코드리뷰 시 `docs/design/DESIGN.md` 와 어긋나는 구현을 발견하면 반드시 지적
+- `docs/design/DESIGN.md`에 없는 새 시각 결정이 필요하면 임의로 내리지 말고 합의 후 문서 업데이트
+- `docs/design/DESIGN.md § 11 다음 단계` 에 구현 순서 있음 — 테마 교체가 최우선
