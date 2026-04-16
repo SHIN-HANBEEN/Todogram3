@@ -143,6 +143,7 @@ describe('Command registry consistency', () => {
     const validKeys = new Set([
       'interactive', 'compact', 'depth', 'selector',
       'diff', 'annotate', 'outputPath', 'cursorInteractive',
+      'heatmap',
     ]);
     for (const flag of SNAPSHOT_FLAGS) {
       expect(validKeys.has(flag.optionKey)).toBe(true);
@@ -1519,6 +1520,26 @@ describe('Test failure triage in ship skill', () => {
   test('ship/SKILL.md uses in-branch language for stop condition', () => {
     const content = fs.readFileSync(path.join(ROOT, 'ship', 'SKILL.md'), 'utf-8');
     expect(content).toContain('In-branch test failures');
+  });
+});
+
+describe('no compiled binaries in git', () => {
+  test('git tracks no Mach-O or ELF binaries', () => {
+    const result = require('child_process').execSync(
+      'git ls-files -z | xargs -0 file --mime-type 2>/dev/null | grep -E "application/(x-mach-binary|x-executable|x-pie-executable|x-sharedlib)" || true',
+      { cwd: ROOT, encoding: 'utf-8' }
+    ).trim();
+    const files = result ? result.split('\n').map((l: string) => l.split(':')[0].trim()) : [];
+    expect(files).toEqual([]);
+  });
+
+  test('git tracks no files larger than 2MB', () => {
+    const result = require('child_process').execSync(
+      'git ls-files -z | xargs -0 -I{} sh -c \'size=$(wc -c < "{}" 2>/dev/null | tr -d " "); [ "$size" -gt 2097152 ] 2>/dev/null && echo "{}:${size}"\' || true',
+      { cwd: ROOT, encoding: 'utf-8' }
+    ).trim();
+    const files = result ? result.split('\n').filter(Boolean) : [];
+    expect(files).toEqual([]);
   });
 });
 

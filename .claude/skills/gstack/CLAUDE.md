@@ -20,6 +20,8 @@ bun run dev:skill    # watch mode: auto-regen + validate on change
 bun run eval:list    # list all eval runs from ~/.gstack-dev/evals/
 bun run eval:compare # compare two eval runs (auto-picks most recent)
 bun run eval:summary # aggregate stats across all eval runs
+bun run slop          # full slop-scan report (all files)
+bun run slop:diff     # slop findings in files changed on this branch only
 ```
 
 `test:evals` requires `ANTHROPIC_API_KEY`. Codex E2E tests (`test/codex-e2e.test.ts`)
@@ -136,6 +138,11 @@ SKILL.md files are **generated** from `.tmpl` templates. To update docs:
 To add a new browse command: add it to `browse/src/commands.ts` and rebuild.
 To add a snapshot flag: add it to `SNAPSHOT_FLAGS` in `browse/src/snapshot.ts` and rebuild.
 
+**Token ceiling:** Generated SKILL.md files must stay under 100KB (~25K tokens).
+`gen-skill-docs` warns if any file exceeds this. If a skill template grows past the
+ceiling, consider extracting optional sections into separate resolvers that only
+inject when relevant, or making verbose evaluation rubrics more concise.
+
 **Merge conflicts on SKILL.md files:** NEVER resolve conflicts on generated SKILL.md
 files by accepting either side. Instead: (1) resolve conflicts on the `.tmpl` templates
 and `scripts/gen-skill-docs.ts` (the sources of truth), (2) run `bun run gen:skill-docs`
@@ -186,10 +193,10 @@ failure modes. The sidebar spans 5 files across 2 codebases (extension + server)
 with non-obvious ordering dependencies. The doc exists to prevent the kind of
 silent failures that come from not understanding the cross-component flow.
 
-## Vendored symlink awareness
+## Dev symlink awareness
 
 When developing gstack, `.claude/skills/gstack` may be a symlink back to this
-working directory (gitignored). This means skill changes are **live immediately** —
+working directory (gitignored). This means skill changes are **live immediately**,
 great for rapid iteration, risky during big refactors where half-written skills
 could break other Claude Code sessions using gstack concurrently.
 
@@ -204,9 +211,11 @@ symlink or a real copy. If it's a symlink to your working directory, be aware th
 with a SKILL.md symlink inside (e.g., `qa/SKILL.md -> gstack/qa/SKILL.md`). This
 ensures Claude discovers them as top-level skills, not nested under `gstack/`.
 Names are either short (`qa`) or namespaced (`gstack-qa`), controlled by
-`skill_prefix` in `~/.gstack/config.yaml`. When vendoring into a project, run
-`./setup` after symlinking to create the per-skill directories. Pass `--no-prefix`
-or `--prefix` to skip the interactive prompt.
+`skill_prefix` in `~/.gstack/config.yaml`. Pass `--no-prefix` or `--prefix` to
+skip the interactive prompt.
+
+**Note:** Vendoring gstack into a project's repo is deprecated. Use global install
++ `./setup --team` instead. See README.md for team mode instructions.
 
 **For plan reviews:** When reviewing plans that modify skill templates or the
 gen-skill-docs pipeline, consider whether the changes should be tested in isolation
@@ -247,6 +256,62 @@ Examples of good bisection:
 
 When the user says "bisect commit" or "bisect and push," split staged/unstaged
 changes into logical commits and push.
+
+## Slop-scan: AI code quality, not AI code hiding
+
+We use [slop-scan](https://github.com/benvinegar/slop-scan) to catch patterns where
+AI-generated code is genuinely worse than what a human would write. We are NOT trying
+to pass as human code. We are AI-coded and proud of it. The goal is code quality.
+
+```bash
+npx slop-scan scan .          # human-readable report
+npx slop-scan scan . --json   # machine-readable for diffing
+```
+
+Config: `slop-scan.config.json` at repo root (currently excludes `**/vendor/**`).
+
+### What to fix (genuine quality improvements)
+
+- **Empty catches around file ops** — use `safeUnlink()` (ignores ENOENT, rethrows
+  EPERM/EIO). A swallowed EPERM in cleanup means silent data loss.
+- **Empty catches around process kills** — use `safeKill()` (ignores ESRCH, rethrows
+  EPERM). A swallowed EPERM means you think you killed something you didn't.
+- **Redundant `return await`** — remove when there's no enclosing try block. Saves a
+  microtask, signals intent.
+- **Typed exception catches** — `catch (err) { if (!(err instanceof TypeError)) throw err }`
+  is genuinely better than `catch {}` when the try block does URL parsing or DOM work.
+  You know what error you expect, so say so.
+
+### What NOT to fix (linter gaming, not quality)
+
+- **String-matching on error messages** — `err.message.includes('closed')` is brittle.
+  Playwright/Chrome can change wording anytime. If a fire-and-forget operation can fail
+  for ANY reason and you don't care, `catch {}` is the correct pattern.
+- **Adding comments to exempt pass-through wrappers** — "alias for active session" above
+  a method just to trip slop-scan's exemption rule is noise, not documentation.
+- **Converting extension catch-and-log to selective rethrow** — Chrome extensions crash
+  entirely on uncaught errors. If the catch logs and continues, that IS the right pattern
+  for extension code. Don't make it throw.
+- **Tightening best-effort cleanup paths** — shutdown, emergency cleanup, and disconnect
+  code should use `safeUnlinkQuiet()` (swallows ALL errors). A cleanup path that throws
+  on EPERM means the rest of cleanup doesn't run. That's worse.
+
+### Utilities in `browse/src/error-handling.ts`
+
+| Function | Use when | Behavior |
+|----------|----------|----------|
+| `safeUnlink(path)` | Normal file deletion | Ignores ENOENT, rethrows others |
+| `safeUnlinkQuiet(path)` | Shutdown/emergency cleanup | Swallows all errors |
+| `safeKill(pid, signal)` | Sending signals | Ignores ESRCH, rethrows others |
+| `isProcessAlive(pid)` | Boolean process checks | Returns true/false, never throws |
+
+### Score tracking
+
+Baseline (2026-04-09, before cleanup): 100 findings, 432.8 score, 2.38 score/file.
+After cleanup: 90 findings, 358.1 score, 1.96 score/file.
+
+Don't chase the number. Fix patterns that represent actual code quality problems.
+Accept findings where the "sloppy" pattern is the correct engineering choice.
 
 ## Community PR guardrails
 
@@ -400,6 +465,29 @@ Also when running targeted E2E tests to debug failures:
 - Run in **foreground** (`bun test ...`), not background with `&` and `tee`
 - Never `pkill` running eval processes and restart — you lose results and waste money
 - One clean run beats three killed-and-restarted runs
+
+## Publishing native OpenClaw skills to ClawHub
+
+Native OpenClaw skills live in `openclaw/skills/gstack-openclaw-*/SKILL.md`. These are
+hand-crafted methodology skills (not generated by the pipeline) published to ClawHub
+so any OpenClaw user can install them.
+
+**Publishing:** The command is `clawhub publish` (NOT `clawhub skill publish`):
+
+```bash
+clawhub publish openclaw/skills/gstack-openclaw-office-hours \
+  --slug gstack-openclaw-office-hours --name "gstack Office Hours" \
+  --version 1.0.0 --changelog "description of changes"
+```
+
+Repeat for each skill: `gstack-openclaw-ceo-review`, `gstack-openclaw-investigate`,
+`gstack-openclaw-retro`. Bump `--version` on each update.
+
+**Auth:** `clawhub login` (opens browser for GitHub auth). `clawhub whoami` to verify.
+
+**Updating:** Same `clawhub publish` command with a higher `--version` and `--changelog`.
+
+**Verification:** `clawhub search gstack` to confirm they're live.
 
 ## Deploying to the active skill
 

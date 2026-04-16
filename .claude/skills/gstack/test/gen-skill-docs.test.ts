@@ -749,6 +749,22 @@ describe('TEST_COVERAGE_AUDIT placeholders', () => {
       expect(shipSkill).toContain(phrase);
     }
   });
+
+  test('ship SKILL.md contains review army specialist dispatch', () => {
+    expect(shipSkill).toContain('Specialist Dispatch');
+    expect(shipSkill).toContain('Step 3.55');
+    expect(shipSkill).toContain('Step 3.56');
+  });
+
+  test('ship SKILL.md contains cross-review finding dedup', () => {
+    expect(shipSkill).toContain('Cross-review finding dedup');
+    expect(shipSkill).toContain('Step 3.57');
+  });
+
+  test('ship SKILL.md contains re-run idempotency behavior', () => {
+    expect(shipSkill).toContain('Re-run behavior (idempotency)');
+    expect(shipSkill).toContain('Never skip a verification step');
+  });
 });
 
 // --- {{TEST_FAILURE_TRIAGE}} resolver tests ---
@@ -1739,7 +1755,10 @@ describe('Codex generation (--host codex)', () => {
   test('Claude output unchanged: all Claude skills have zero Codex paths', () => {
     for (const skill of ALL_SKILLS) {
       const content = fs.readFileSync(path.join(ROOT, skill.dir, 'SKILL.md'), 'utf-8');
-      expect(content).not.toContain('~/.codex/');
+      // pair-agent legitimately documents how Codex agents store credentials
+      if (skill.dir !== 'pair-agent') {
+        expect(content).not.toContain('~/.codex/');
+      }
       // gstack-upgrade legitimately references .agents/skills for cross-platform detection
       if (skill.dir !== 'gstack-upgrade') {
         expect(content).not.toContain('.agents/skills');

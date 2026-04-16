@@ -24,4 +24,3 @@ extension/.auth.json
 .env.*
 !.env.example
 supabase/.temp/
-bin/gstack-global-discover.exe
