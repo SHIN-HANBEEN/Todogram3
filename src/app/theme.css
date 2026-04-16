@@ -1,97 +1,134 @@
+/*
+ * Todogram v3 — Quiet Layer 디자인 시스템 토큰 정의
+ *
+ * 이 파일은 `docs/design/DESIGN.md` v1.0 을 코드로 옮긴 single source of truth 입니다.
+ * 값 변경 전 반드시 DESIGN.md 와 동기화.
+ *
+ * 구조:
+ *   1) @theme {} — Tailwind v4 유틸리티 클래스 자동 생성 (color/text/radius/shadow/font)
+ *   2) @layer base { .dark-mode } — 다크모드 시맨틱 토큰 재매핑
+ *
+ * 시맨틱 토큰만 사용 (DESIGN.md §9 Hard Rule #1):
+ *   `bg-bg-primary`, `text-text-primary`, `border-border-secondary`, `text-fg-tertiary`
+ */
+
 @theme {
-  /* FONT FAMILY */
+  /* -------------------------------------------------------------------- */
+  /* FONT FAMILY — DESIGN.md §3                                           */
+  /*   body:    Pretendard Variable (한글+라틴 최적화)                    */
+  /*   display: Instrument Serif   (emotion moments only)                 */
+  /*   mono:    JetBrains Mono     (시간/숫자 tabular-nums)               */
+  /* -------------------------------------------------------------------- */
   --font-body:
-    var(--font-inter, 'Inter'), -apple-system, 'Segoe UI', Roboto, Arial,
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont,
+    'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', system-ui,
     sans-serif;
   --font-display:
-    var(--font-inter, 'Inter'), -apple-system, 'Segoe UI', Roboto, Arial,
-    sans-serif;
+    var(--font-instrument-serif, 'Instrument Serif'), ui-serif, Georgia,
+    'Times New Roman', serif;
   --font-mono:
-    ui-monospace, 'Roboto Mono', SFMono-Regular, Menlo, Monaco, Consolas,
-    'Liberation Mono', 'Courier New', monospace;
+    var(--font-jetbrains-mono, 'JetBrains Mono'), ui-monospace, SFMono-Regular,
+    Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
-  /* FONT SIZE */
-  --text-xs: calc(var(--spacing) * 3);
-  --text-xs--line-height: calc(var(--spacing) * 4.5);
+  /* -------------------------------------------------------------------- */
+  /* FONT SIZE — DESIGN.md §3 스케일                                      */
+  /*   display-* 는 Instrument Serif 자동 적용 (globals.css selector)     */
+  /* -------------------------------------------------------------------- */
+  --text-xs: 0.75rem; /* 12px — 마이크로 라벨, 힌트 */
+  --text-xs--line-height: 1.5;
 
-  --text-sm: calc(var(--spacing) * 3.5);
-  --text-sm--line-height: calc(var(--spacing) * 5);
+  --text-sm: 0.875rem; /* 14px — 메타, 보조 텍스트 */
+  --text-sm--line-height: 1.55;
 
-  --text-md: calc(var(--spacing) * 4);
-  --text-md--line-height: calc(var(--spacing) * 6);
+  --text-md: 1rem; /* 16px — 본문 기본 */
+  --text-md--line-height: 1.6;
 
-  --text-lg: calc(var(--spacing) * 4.5);
-  --text-lg--line-height: calc(var(--spacing) * 7);
+  --text-lg: 1.125rem; /* 18px — 카드 제목 */
+  --text-lg--line-height: 1.55;
+  --text-lg--letter-spacing: -0.1px;
 
-  --text-xl: calc(var(--spacing) * 5);
-  --text-xl--line-height: calc(var(--spacing) * 7.5);
+  --text-xl: 1.25rem; /* 20px — 섹션 헤더 */
+  --text-xl--line-height: 1.4;
+  --text-xl--letter-spacing: -0.2px;
 
-  --text-display-xs: calc(var(--spacing) * 6);
-  --text-display-xs--line-height: calc(var(--spacing) * 8);
+  --text-display-xs: 1.625rem; /* 26px — 모바일 페이지 타이틀 */
+  --text-display-xs--line-height: 1.2;
+  --text-display-xs--letter-spacing: -0.4px;
 
-  --text-display-sm: calc(var(--spacing) * 7.5);
-  --text-display-sm--line-height: calc(var(--spacing) * 9.5);
+  --text-display-sm: 2rem; /* 32px — 데스크탑 페이지 타이틀 */
+  --text-display-sm--line-height: 1.15;
+  --text-display-sm--letter-spacing: -0.6px;
 
-  --text-display-md: calc(var(--spacing) * 9);
-  --text-display-md--line-height: calc(var(--spacing) * 11);
-  --text-display-md--letter-spacing: -0.72px;
+  --text-display-md: 2.5rem; /* 40px — 섹션 히어로 */
+  --text-display-md--line-height: 1.1;
+  --text-display-md--letter-spacing: -0.8px;
 
-  --text-display-lg: calc(var(--spacing) * 12);
-  --text-display-lg--line-height: calc(var(--spacing) * 15);
-  --text-display-lg--letter-spacing: -0.96px;
+  --text-display-lg: 3.5rem; /* 56px — 마케팅/온보딩 히어로 */
+  --text-display-lg--line-height: 1.05;
+  --text-display-lg--letter-spacing: -1.2px;
 
-  --text-display-xl: calc(var(--spacing) * 15);
-  --text-display-xl--line-height: calc(var(--spacing) * 18);
-  --text-display-xl--letter-spacing: -1.2px;
+  --text-display-xl: 4.5rem; /* 72px — 랜딩 */
+  --text-display-xl--line-height: 1;
+  --text-display-xl--letter-spacing: -1.8px;
 
-  --text-display-2xl: calc(var(--spacing) * 18);
-  --text-display-2xl--line-height: calc(var(--spacing) * 22.5);
-  --text-display-2xl--letter-spacing: -1.44px;
+  /* 이전 starter 에서 text-display-2xl 을 쓰던 곳이 있어 호환 유지, 값은 xl 과 동일 */
+  --text-display-2xl: 4.5rem;
+  --text-display-2xl--line-height: 1;
+  --text-display-2xl--letter-spacing: -1.8px;
 
-  /* MAX WIDTH */
-  --max-width-container: 1280px;
+  /* -------------------------------------------------------------------- */
+  /* LAYOUT — DESIGN.md §6                                                */
+  /* -------------------------------------------------------------------- */
+  --max-width-container: 1200px;
 
   /* BREAKPOINTS */
   --breakpoint-xxs: 320px;
-  /* This must match the breakpoint in Sonner: https://github.com/emilkowalski/sonner/blob/main/src/styles.css */
+  /* Sonner 토스트 디자인 기준 (https://github.com/emilkowalski/sonner) */
   --breakpoint-xs: 600px;
 
-  /* RADIUS */
+  /* -------------------------------------------------------------------- */
+  /* RADIUS — DESIGN.md §6 하이어라키                                      */
+  /*   lg=10px (버튼/인풋), xl=12px (카드 기본), 3xl=24px (바텀 시트)       */
+  /* -------------------------------------------------------------------- */
   --radius-none: 0px;
-  --radius-xs: 0.125rem;
-  --radius-sm: 0.25rem;
+  --radius-xs: 0.125rem; /* 2px */
+  --radius-sm: 0.25rem; /* 4px  — 체크박스 */
   --radius-DEFAULT: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
-  --radius-full: 9999px;
+  --radius-md: 0.5rem; /* 8px */
+  --radius-lg: 0.625rem; /* 10px — 버튼/인풋 */
+  --radius-xl: 0.75rem; /* 12px — 카드 기본 */
+  --radius-2xl: 1rem; /* 16px — 섹션 박스, 큰 모달 */
+  --radius-3xl: 1.5rem; /* 24px — 바텀 시트 */
+  --radius-full: 9999px; /* 칩, FAB, 아바타, 토글 */
 
-  /* SHADOW */
-  --shadow-xs: 0px 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-sm:
-    0px 1px 3px rgba(0, 0, 0, 0.1), 0px 1px 2px -1px rgba(0, 0, 0, 0.1);
+  /* -------------------------------------------------------------------- */
+  /* SHADOW — DESIGN.md §6-3 Quiet Layer                                  */
+  /*   스큐어모픽/modern-mockup 섀도우는 스타터 호환용으로 유지            */
+  /* -------------------------------------------------------------------- */
+  --shadow-xs: 0 1px 1px rgba(26, 26, 23, 0.03);
+  --shadow-sm: 0 1px 2px rgba(26, 26, 23, 0.04);
   --shadow-md:
-    0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -2px rgba(0, 0, 0, 0.06);
+    0 2px 4px rgba(26, 26, 23, 0.04), 0 4px 8px rgba(26, 26, 23, 0.04);
   --shadow-lg:
-    0px 12px 16px -4px rgba(0, 0, 0, 0.08),
-    0px 4px 6px -2px rgba(0, 0, 0, 0.03), 0px 2px 2px -1px rgba(0, 0, 0, 0.04);
+    0 4px 8px rgba(26, 26, 23, 0.04), 0 12px 24px rgba(26, 26, 23, 0.06);
   --shadow-xl:
-    0px 20px 24px -4px rgba(0, 0, 0, 0.08),
-    0px 8px 8px -4px rgba(0, 0, 0, 0.03), 0px 3px 3px -1.5px rgba(0, 0, 0, 0.04);
-  --shadow-2xl:
-    0px 24px 48px -12px rgba(0, 0, 0, 0.18),
-    0px 4px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-3xl:
-    0px 32px 64px -12px rgba(0, 0, 0, 0.14),
-    0px 5px 5px -2.5px rgba(0, 0, 0, 0.04);
+    0 8px 16px rgba(26, 26, 23, 0.04), 0 20px 40px rgba(26, 26, 23, 0.08);
+  --shadow-2xl: 0 24px 48px rgba(26, 26, 23, 0.12);
+  --shadow-3xl: 0 32px 64px rgba(26, 26, 23, 0.14);
 
+  /* Todogram Quiet Layer 전용 (카드/FAB/모달 명시적 용도) */
+  --shadow-card:
+    0 1px 2px rgba(26, 26, 23, 0.04), 0 2px 8px rgba(26, 26, 23, 0.04);
+  --shadow-float:
+    0 4px 16px rgba(58, 110, 91, 0.18), 0 2px 4px rgba(26, 26, 23, 0.06);
+  --shadow-modal:
+    0 20px 60px rgba(26, 26, 23, 0.08), 0 8px 20px rgba(26, 26, 23, 0.04);
+
+  /* 스타터 호환: 스큐어모픽 버튼, 아이폰 목업 (신규 코드에선 사용 X) */
   --shadow-skeuomorphic:
-    0px 0px 0px 1px rgba(0, 0, 0, 0.18) inset,
-    0px -2px 0px 0px rgba(0, 0, 0, 0.05) inset;
+    0px 0px 0px 1px rgba(0, 0, 0, 0.12) inset,
+    0px -2px 0px 0px rgba(0, 0, 0, 0.04) inset;
   --shadow-xs-skeuomorphic: var(--shadow-skeuomorphic), var(--shadow-xs);
-
   --shadow-modern-mockup-inner-lg:
     0px 0px 3.765px 1.255px rgba(10, 13, 18, 0.08) inset,
     0px 0px 2.51px 1.255px rgba(10, 13, 18, 0.03) inset;
@@ -101,7 +138,6 @@
   --shadow-modern-mockup-inner-sm:
     0px 0px 4.48px 1.493px rgba(10, 13, 18, 0.08) inset,
     0px 0px 2.987px 1.493px rgba(10, 13, 18, 0.03) inset;
-
   --shadow-modern-mockup-outer-lg:
     0px 7.529px 10.039px -2.51px rgba(10, 13, 18, 0.08),
     0px 2.51px 3.765px -1.255px rgba(10, 13, 18, 0.03),
@@ -110,10 +146,12 @@
     0px 3.385px 4.513px -1.128px rgba(10, 13, 18, 0.08),
     0px 1.128px 1.692px -0.564px rgba(10, 13, 18, 0.03),
     0px 0.564px 0.564px -0.282px rgba(10, 13, 18, 0.04);
-
   --drop-shadow-iphone-mockup: 20px 12px 18px rgba(16, 24, 40, 0.2);
 
-  /* ANIMATIONS */
+  /* -------------------------------------------------------------------- */
+  /* ANIMATIONS                                                           */
+  /*   `prefers-reduced-motion` 대응은 globals.css 에서 전역 처리         */
+  /* -------------------------------------------------------------------- */
   --animate-marquee: marquee 60s linear infinite;
   --animate-caret-blink: caret-blink 1s infinite;
 
@@ -137,34 +175,80 @@
     }
   }
 
-  /* BASE COLOR */
+  /* -------------------------------------------------------------------- */
+  /* BASE COLOR                                                           */
+  /* -------------------------------------------------------------------- */
   --color-transparent: rgb(0 0 0 / 0);
-
   --color-white: rgb(255 255 255);
   --color-black: rgb(0 0 0);
-
-  /* These will be inverted in dark mode. */
   --color-alpha-white: rgb(255 255 255);
   --color-alpha-black: rgb(0 0 0);
 
-  --color-brand-50: rgb(249 245 255);
-  --color-brand-100: rgb(244 235 255);
-  --color-brand-200: rgb(233 215 254);
-  --color-brand-300: rgb(214 187 251);
-  --color-brand-400: rgb(182 146 246);
-  --color-brand-500: rgb(158 119 237);
-  --color-brand-600: rgb(127 86 217);
-  --color-brand-700: rgb(105 65 198);
-  --color-brand-800: rgb(83 56 158);
-  --color-brand-900: rgb(66 48 125);
-  --color-brand-950: rgb(44 28 95);
+  /* -------------------------------------------------------------------- */
+  /* BRAND — Sage green. DESIGN.md §4-1                                   */
+  /*   violet/purple UntitledUI 기본값 폐기. #3A6E5B 를 brand-600 에 배치. */
+  /*   Light 표준: brand-600 (#3A6E5B)                                    */
+  /*   Dark  표준: brand-400 (#6FA58C)                                    */
+  /* -------------------------------------------------------------------- */
+  --color-brand-25: #f6faf8;
+  --color-brand-50: #f0f6f2;
+  --color-brand-100: #e8f0ec; /* DESIGN --brand-subtle light */
+  --color-brand-200: #c7ded2;
+  --color-brand-300: #9ec2b0;
+  --color-brand-400: #6fa58c; /* DESIGN --brand dark */
+  --color-brand-500: #4f8872;
+  --color-brand-600: #3a6e5b; /* DESIGN --brand light (THE BRAND) */
+  --color-brand-700: #2e5849; /* DESIGN --brand-hover light */
+  --color-brand-800: #25463a; /* DESIGN --brand-text light */
+  --color-brand-900: #1b3229;
+  --color-brand-950: #121e18;
 
-  /* LIGHT MODE VARIABLES */
+  /* -------------------------------------------------------------------- */
+  /* NEUTRAL — Warm neutral palette. DESIGN.md §4-2                       */
+  /*   갈색 언더톤. 순수 cool gray 사용 금지.                              */
+  /*   25: bg-page / 50: bg-muted / 100: bg-subtle / 200: border-default / */
+  /*   300: border-muted / 400: text-tertiary / 600: text-muted /          */
+  /*   700: text-secondary / 900: text-primary / 950: bg-page dark         */
+  /* -------------------------------------------------------------------- */
+  --color-neutral-25: #fafaf7;
+  --color-neutral-50: #f5f4ee;
+  --color-neutral-100: #efede5;
+  --color-neutral-200: #e8e6de;
+  --color-neutral-300: #d9d6cc;
+  --color-neutral-400: #9b9992;
+  --color-neutral-500: #82807a;
+  --color-neutral-600: #6b6a63;
+  --color-neutral-700: #4a4945;
+  --color-neutral-800: #2e2d2a;
+  --color-neutral-900: #1a1a17;
+  --color-neutral-950: #0e0f0c;
 
-  --color-alpha-white: rgb(255 255 255);
-  --color-alpha-black: rgb(0 0 0);
+  /* -------------------------------------------------------------------- */
+  /* LABEL PALETTE — DESIGN.md §4-3 (6색 역할 구분)                       */
+  /*   사용법: 칩 배경 = rgba(hex, 0.12), 텍스트 = hex full                */
+  /*   다크모드에선 -bg alpha 0.20, -fg 값도 밝은 쪽으로 shift             */
+  /*   Google Calendar colorId 매핑 참고:                                  */
+  /*     sage=10(basil), terracotta=11(tomato), dust-blue=9(blueberry),    */
+  /*     amber=5(banana), plum=3(grape), moss=2(sage)                      */
+  /* -------------------------------------------------------------------- */
+  --color-label-sage: #3a6e5b;
+  --color-label-sage-bg: rgba(58, 110, 91, 0.12);
+  --color-label-terracotta: #b3573a;
+  --color-label-terracotta-bg: rgba(179, 87, 58, 0.12);
+  --color-label-dust-blue: #5a7a99;
+  --color-label-dust-blue-bg: rgba(90, 122, 153, 0.12);
+  --color-label-amber: #c08a3e;
+  --color-label-amber-bg: rgba(192, 138, 62, 0.12);
+  --color-label-plum: #8c5a6e;
+  --color-label-plum-bg: rgba(140, 90, 110, 0.12);
+  --color-label-moss: #7a8b4a;
+  --color-label-moss-bg: rgba(122, 139, 74, 0.12);
 
-  /* UTILITY COLORS */
+  /* -------------------------------------------------------------------- */
+  /* UTILITY COLORS — 차트/배지 스케일 (starter 호환 유지)                */
+  /*   DESIGN Hard Rule #2: purple/indigo/fuchsia/pink 은 신규 코드 금지   */
+  /*   기존 shadcn 페이지 호환을 위해 alias 는 유지, 신규 사용 지양        */
+  /* -------------------------------------------------------------------- */
   --color-utility-blue-50: var(--color-blue-50);
   --color-utility-blue-100: var(--color-blue-100);
   --color-utility-blue-200: var(--color-blue-200);
@@ -314,109 +398,124 @@
   --color-utility-amber-600: var(--color-amber-600);
   --color-utility-amber-700: var(--color-amber-700);
 
-  /* TEXT COLORS */
+  /* -------------------------------------------------------------------- */
+  /* SEMANTIC — TEXT                                                      */
+  /*   primary(#1A1A17) → secondary(#4A4945) → tertiary(#6B6A63)          */
+  /*   → quaternary(#9B9992) / placeholder(#82807A)                       */
+  /* -------------------------------------------------------------------- */
   --color-text-primary: var(--color-neutral-900);
-  --color-text-tertiary: var(--color-neutral-600);
-  --color-text-error-primary: var(--color-red-600);
-  --color-text-warning-primary: var(--color-yellow-600);
-  --color-text-success-primary: var(--color-green-600);
-  --color-text-white: var(--color-white);
   --color-text-secondary: var(--color-neutral-700);
   --color-text-secondary_hover: var(--color-neutral-800);
+  --color-text-tertiary: var(--color-neutral-600);
   --color-text-tertiary_hover: var(--color-neutral-700);
-  --color-text-brand-secondary: var(--color-brand-700);
+  --color-text-quaternary: var(--color-neutral-400);
   --color-text-placeholder: var(--color-neutral-500);
+  --color-text-white: var(--color-white);
+  --color-text-brand-primary: var(--color-brand-800);
+  --color-text-brand-secondary: var(--color-brand-700);
   --color-text-brand-tertiary: var(--color-brand-600);
-  --color-text-editor-icon-fg: var(--color-neutral-400);
-  --color-text-editor-icon-fg_active: var(--color-neutral-500);
-  --color-text-quaternary: var(--color-neutral-500);
-  --color-text-brand-primary: var(--color-brand-900);
+  --color-text-brand-tertiary_alt: var(--color-brand-600);
+  --color-text-brand-secondary_hover: var(--color-brand-800);
   --color-text-primary_on-brand: var(--color-white);
   --color-text-secondary_on-brand: var(--color-brand-200);
   --color-text-tertiary_on-brand: var(--color-brand-200);
   --color-text-quaternary_on-brand: var(--color-brand-300);
-  --color-text-brand-tertiary_alt: var(--color-brand-600);
+  --color-text-error-primary: var(--color-red-600);
   --color-text-error-primary_hover: var(--color-red-700);
-  --color-text-brand-secondary_hover: var(--color-brand-800);
+  --color-text-warning-primary: var(--color-yellow-600);
+  --color-text-success-primary: var(--color-green-600);
+  --color-text-editor-icon-fg: var(--color-neutral-400);
+  --color-text-editor-icon-fg_active: var(--color-neutral-500);
 
-  /* BORDER COLORS */
-  --color-border-primary: var(--color-neutral-300);
-  --color-border-secondary: var(--color-neutral-200);
-  --color-border-secondary_alt: rgb(0 0 0 / 0.1);
-  --color-border-tertiary: var(--color-neutral-100);
+  /* -------------------------------------------------------------------- */
+  /* SEMANTIC — BORDER                                                    */
+  /* -------------------------------------------------------------------- */
+  --color-border-primary: var(--color-neutral-300); /* #D9D6CC */
+  --color-border-secondary: var(--color-neutral-200); /* #E8E6DE */
+  --color-border-secondary_alt: rgba(26, 26, 23, 0.1);
+  --color-border-tertiary: var(--color-neutral-100); /* #EFEDE5 */
   --color-border-error: var(--color-red-500);
   --color-border-error_subtle: var(--color-red-300);
   --color-border-brand: var(--color-brand-500);
   --color-border-brand_alt: var(--color-brand-600);
 
-  /* FOREGROUND COLORS */
-  --color-fg-secondary: var(--color-neutral-700);
-  --color-fg-warning-primary: var(--color-yellow-600);
-  --color-fg-success-primary: var(--color-green-600);
-  --color-fg-white: var(--color-white);
-  --color-fg-success-secondary: var(--color-green-500);
-  --color-fg-secondary_hover: var(--color-neutral-800);
+  /* -------------------------------------------------------------------- */
+  /* SEMANTIC — FOREGROUND (icons)                                        */
+  /* -------------------------------------------------------------------- */
   --color-fg-primary: var(--color-neutral-900);
-  --color-fg-brand-secondary: var(--color-brand-500);
-  --color-fg-brand-primary: var(--color-brand-600);
-  --color-fg-quaternary: var(--color-neutral-400);
-  --color-fg-quaternary_hover: var(--color-neutral-500);
-  --color-fg-error-primary: var(--color-red-600);
-  --color-fg-warning-secondary: var(--color-yellow-500);
-  --color-fg-error-secondary: var(--color-red-500);
+  --color-fg-secondary: var(--color-neutral-700);
+  --color-fg-secondary_hover: var(--color-neutral-800);
   --color-fg-tertiary: var(--color-neutral-600);
   --color-fg-tertiary_hover: var(--color-neutral-700);
-  --color-fg-brand-primary_alt: var(--color-fg-brand-primary);
-  --color-fg-brand-secondary_alt: var(--color-fg-brand-secondary);
+  --color-fg-quaternary: var(--color-neutral-400);
+  --color-fg-quaternary_hover: var(--color-neutral-500);
+  --color-fg-white: var(--color-white);
+  --color-fg-brand-primary: var(--color-brand-600);
+  --color-fg-brand-primary_alt: var(--color-brand-600);
+  --color-fg-brand-secondary: var(--color-brand-500);
+  --color-fg-brand-secondary_alt: var(--color-brand-500);
   --color-fg-brand-secondary_hover: var(--color-brand-600);
+  --color-fg-error-primary: var(--color-red-600);
+  --color-fg-error-secondary: var(--color-red-500);
+  --color-fg-warning-primary: var(--color-yellow-600);
+  --color-fg-warning-secondary: var(--color-yellow-500);
+  --color-fg-success-primary: var(--color-green-600);
+  --color-fg-success-secondary: var(--color-green-500);
 
-  /* BACKGROUND COLORS */
+  /* -------------------------------------------------------------------- */
+  /* SEMANTIC — BACKGROUND                                                */
+  /*   primary: surface (내 태스크 카드, #FFFFFF)                         */
+  /*   secondary: page  (#FAFAF7)                                         */
+  /*   tertiary: muted  (외부 이벤트 카드, #F5F4EE)                       */
+  /*   quaternary: subtle (섹션 구분, #EFEDE5)                            */
+  /* -------------------------------------------------------------------- */
   --color-bg-primary: var(--color-white);
-  --color-bg-tertiary: var(--color-neutral-100);
-  --color-bg-brand-primary: var(--color-brand-50);
-  --color-bg-error-secondary: var(--color-red-100);
-  --color-bg-warning-primary: var(--color-yellow-50);
-  --color-bg-warning-secondary: var(--color-yellow-100);
-  --color-bg-success-primary: var(--color-green-50);
-  --color-bg-success-secondary: var(--color-green-100);
-  --color-bg-brand-solid: var(--color-brand-600);
-  --color-bg-secondary-solid: var(--color-neutral-600);
-  --color-bg-error-solid: var(--color-red-600);
-  --color-bg-warning-solid: var(--color-yellow-600);
-  --color-bg-success-solid: var(--color-green-600);
-  --color-bg-secondary_hover: var(--color-neutral-100);
-  --color-bg-primary_hover: var(--color-neutral-50);
-  --color-bg-active: var(--color-neutral-50);
-  --color-bg-brand-solid_hover: var(--color-brand-700);
-  --color-bg-error-primary: var(--color-red-50);
-  --color-bg-brand-secondary: var(--color-brand-100);
-  --color-bg-secondary: var(--color-neutral-50);
-  --color-bg-quaternary: var(--color-neutral-200);
+  --color-bg-secondary: var(--color-neutral-25);
+  --color-bg-tertiary: var(--color-neutral-50);
+  --color-bg-quaternary: var(--color-neutral-100);
   --color-bg-primary_alt: var(--color-white);
-  --color-bg-brand-primary_alt: var(--color-brand-50);
   --color-bg-secondary_alt: var(--color-neutral-50);
-  --color-bg-overlay: var(--color-neutral-950);
+  --color-bg-primary_hover: var(--color-neutral-25);
+  --color-bg-secondary_hover: var(--color-neutral-100);
+  --color-bg-active: var(--color-neutral-50);
+  --color-bg-brand-primary: var(--color-brand-50);
+  --color-bg-brand-primary_alt: var(--color-brand-50);
+  --color-bg-brand-secondary: var(--color-brand-100);
+  --color-bg-brand-solid: var(--color-brand-600);
+  --color-bg-brand-solid_hover: var(--color-brand-700);
   --color-bg-brand-section: var(--color-brand-800);
   --color-bg-brand-section_subtle: var(--color-brand-700);
+  --color-bg-secondary-solid: var(--color-neutral-600);
   --color-bg-primary-solid: var(--color-neutral-950);
+  --color-bg-overlay: var(--color-neutral-950);
+  --color-bg-error-primary: var(--color-red-50);
+  --color-bg-error-secondary: var(--color-red-100);
+  --color-bg-error-solid: var(--color-red-600);
   --color-bg-error-solid_hover: var(--color-red-700);
+  --color-bg-warning-primary: var(--color-yellow-50);
+  --color-bg-warning-secondary: var(--color-yellow-100);
+  --color-bg-warning-solid: var(--color-yellow-600);
+  --color-bg-success-primary: var(--color-green-50);
+  --color-bg-success-secondary: var(--color-green-100);
+  --color-bg-success-solid: var(--color-green-600);
 
-  /* COMPONENT COLORS */
+  /* -------------------------------------------------------------------- */
+  /* COMPONENT-specific tokens                                            */
+  /* -------------------------------------------------------------------- */
   --color-app-store-badge-border: 166 166 166 1;
-  --color-avatar-styles-bg-neutral: 224 224 224 1;
+  --color-avatar-styles-bg-neutral: var(--color-neutral-200);
   --color-featured-icon-light-fg-brand: var(--color-brand-600);
   --color-featured-icon-light-fg-error: var(--color-red-600);
   --color-featured-icon-light-fg-gray: var(--color-neutral-500);
   --color-featured-icon-light-fg-success: var(--color-green-600);
   --color-featured-icon-light-fg-warning: var(--color-yellow-600);
-  --color-focus-ring-error: var(--color-red-500);
   --color-focus-ring: var(--color-brand-500);
+  --color-focus-ring-error: var(--color-red-500);
   --color-footer-button-fg: var(--color-brand-200);
   --color-footer-button-fg_hover: var(--color-white);
   --color-icon-fg-brand: var(--color-brand-600);
   --color-icon-fg-brand_on-brand: var(--color-brand-200);
   --color-screen-mockup-border: var(--color-neutral-900);
-
   --color-slider-handle-bg: var(--color-white);
   --color-slider-handle-border: var(--color-brand-600);
   --color-toggle-border: var(--color-neutral-300);
@@ -424,7 +523,10 @@
   --color-toggle-slim-border_pressed: var(--color-bg-brand-solid);
   --color-tooltip-supporting-text: var(--color-neutral-300);
 
-  /* BACKGROUND PROPERTY COLORS */
+  /* -------------------------------------------------------------------- */
+  /* LEGACY PROPERTY ALIASES — UntitledUI 컴포넌트가 아직 참조함          */
+  /*   --background-color-*, --text-color-*, --border-color-*, --ring-*   */
+  /* -------------------------------------------------------------------- */
   --background-color-primary: var(--color-bg-primary);
   --background-color-tertiary: var(--color-bg-tertiary);
   --background-color-brand-primary: var(--color-bg-brand-primary);
@@ -457,8 +559,6 @@
   --background-color-border-brand: var(--color-border-brand);
   --background-color-border-brand_alt: var(--color-border-brand_alt);
 
-  /* TEXT PROPERTY COLORS */
-  --color-text-white: var(--color-white);
   --text-color-primary: var(--color-text-primary);
   --text-color-secondary: var(--color-text-secondary);
   --text-color-secondary_hover: var(--color-text-secondary_hover);
@@ -482,8 +582,8 @@
   --text-color-error-primary_hover: var(--color-text-error-primary_hover);
   --text-color-brand-secondary_hover: var(--color-text-brand-secondary_hover);
   --text-color-tooltip-supporting-text: var(--color-tooltip-supporting-text);
+  --text-color-white: var(--color-white);
 
-  /* BORDER PROPERTY COLORS */
   --border-color-primary: var(--color-border-primary);
   --border-color-secondary: var(--color-border-secondary);
   --border-color-secondary_alt: var(--color-border-secondary_alt);
@@ -495,7 +595,6 @@
   --border-color-brand-solid: var(--color-bg-brand-solid);
   --border-color-brand-solid_hover: var(--color-bg-brand-solid_hover);
 
-  /* RING PROPERTY COLORS */
   --ring-color-primary: var(--color-border-primary);
   --ring-color-secondary: var(--color-border-secondary);
   --ring-color-secondary_alt: var(--color-border-secondary_alt);
@@ -507,7 +606,6 @@
   --ring-color-brand-solid: var(--color-bg-brand-solid);
   --ring-color-brand-solid_hover: var(--color-bg-brand-solid_hover);
 
-  /* OUTLINE PROPERTY COLORS */
   --outline-color-primary: var(--color-border-primary);
   --outline-color-secondary: var(--color-border-secondary);
   --outline-color-secondary_alt: var(--color-border-secondary_alt);
@@ -521,14 +619,18 @@
 }
 
 @layer base {
-  /* DARK MODE VARIABLES */
-
+  /*
+   * DARK MODE — DESIGN.md §4-2 다크 컬럼 + §4-5 전환 규칙
+   *   순수 반전 금지. 웜톤 유지.
+   *   sage brand 는 오히려 밝아짐 (brand-400/#6FA58C) — 가독성.
+   *   shadow opacity 3~4배 증가 (§6-3).
+   */
   .dark-mode {
+    /* 알파 반전: 다크모드에선 white 위 overlay 를 black 으로 표현 */
     --color-alpha-white: rgb(12 14 18);
     --color-alpha-black: rgb(255 255 255);
 
-    /* UTILITY COLORS */
-
+    /* ---- UTILITY COLORS (다크모드 스케일 반전) ---- */
     --color-utility-blue-50: var(--color-blue-950);
     --color-utility-blue-100: var(--color-blue-900);
     --color-utility-blue-200: var(--color-blue-800);
@@ -678,89 +780,121 @@
     --color-utility-amber-600: var(--color-amber-400);
     --color-utility-amber-700: var(--color-amber-300);
 
-    --color-text-primary: var(--color-neutral-50);
-    --color-text-tertiary: var(--color-neutral-400);
+    /* ---- SEMANTIC TEXT (DESIGN.md §4-2 dark column) ---- */
+    --color-text-primary: #f0eee7;
+    --color-text-secondary: #c8c6bf;
+    --color-text-secondary_hover: #d9d6cc;
+    --color-text-tertiary: #8c8a84;
+    --color-text-tertiary_hover: #9b9992;
+    --color-text-quaternary: #6b6a63;
+    --color-text-placeholder: #6b6a63;
+    --color-text-white: var(--color-white);
+    --color-text-brand-primary: #a8d1bd; /* DESIGN --brand-text dark */
+    --color-text-brand-secondary: #8bb9a3;
+    --color-text-brand-tertiary: #6fa58c;
+    --color-text-brand-tertiary_alt: #6fa58c;
+    --color-text-brand-secondary_hover: #a8d1bd;
+    --color-text-primary_on-brand: #f0eee7;
+    --color-text-secondary_on-brand: #c7ded2;
+    --color-text-tertiary_on-brand: #9ec2b0;
+    --color-text-quaternary_on-brand: #9ec2b0;
     --color-text-error-primary: var(--color-red-400);
+    --color-text-error-primary_hover: var(--color-red-300);
     --color-text-warning-primary: var(--color-yellow-400);
     --color-text-success-primary: var(--color-green-400);
-    --color-text-white: var(--color-white);
-    --color-text-secondary: var(--color-neutral-300);
-    --color-text-secondary_hover: var(--color-neutral-200);
-    --color-text-tertiary_hover: var(--color-neutral-300);
-    --color-text-brand-secondary: var(--color-neutral-300);
-    --color-text-placeholder: var(--color-neutral-500);
-    --color-text-brand-tertiary: var(--color-neutral-400);
-    --color-text-editor-icon-fg: var(--color-neutral-400);
+    --color-text-editor-icon-fg: #6b6a63;
     --color-text-editor-icon-fg_active: var(--color-white);
-    --color-text-quaternary: var(--color-neutral-400);
-    --color-text-brand-primary: var(--color-neutral-50);
-    --color-text-primary_on-brand: var(--color-neutral-50);
-    --color-text-secondary_on-brand: var(--color-neutral-300);
-    --color-text-tertiary_on-brand: var(--color-neutral-400);
-    --color-text-quaternary_on-brand: var(--color-neutral-400);
-    --color-text-brand-tertiary_alt: var(--color-neutral-50);
-    --color-text-error-primary_hover: var(--color-red-300);
-    --color-text-brand-secondary_hover: var(--color-neutral-200);
 
-    --color-border-secondary: var(--color-neutral-800);
-    --color-border-error_subtle: var(--color-red-500);
-    --color-border-primary: var(--color-neutral-700);
-    --color-border-brand: var(--color-brand-400);
+    /* ---- SEMANTIC BORDER ---- */
+    --color-border-primary: #2b2d28; /* DESIGN --border-default dark */
+    --color-border-secondary: #2b2d28;
+    --color-border-secondary_alt: #3a3c37;
+    --color-border-tertiary: #202220;
+    --color-border-brand: #6fa58c;
+    --color-border-brand_alt: #2b2d28;
     --color-border-error: var(--color-red-400);
-    --color-border-tertiary: var(--color-neutral-800);
-    --color-border-brand_alt: var(--color-neutral-700);
-    --color-border-secondary_alt: var(--color-neutral-800);
+    --color-border-error_subtle: var(--color-red-500);
 
-    --color-fg-secondary: var(--color-neutral-300);
-    --color-fg-warning-primary: var(--color-yellow-500);
-    --color-fg-success-primary: var(--color-green-500);
-    --color-fg-white: var(--color-white);
-    --color-fg-success-secondary: var(--color-green-400);
-    --color-fg-secondary_hover: var(--color-neutral-200);
+    /* ---- SEMANTIC FG ---- */
     --color-fg-primary: var(--color-white);
-    --color-fg-brand-secondary: var(--color-brand-500);
-    --color-fg-brand-primary: var(--color-brand-500);
-    --color-fg-quaternary: var(--color-neutral-600);
-    --color-fg-quaternary_hover: var(--color-neutral-500);
+    --color-fg-secondary: #c8c6bf;
+    --color-fg-secondary_hover: #d9d6cc;
+    --color-fg-tertiary: #8c8a84;
+    --color-fg-tertiary_hover: #9b9992;
+    --color-fg-quaternary: #6b6a63;
+    --color-fg-quaternary_hover: #8c8a84;
+    --color-fg-white: var(--color-white);
+    --color-fg-brand-primary: #6fa58c; /* sage 밝혀서 다크에서도 읽힘 */
+    --color-fg-brand-primary_alt: #8c8a84;
+    --color-fg-brand-secondary: #4f8872;
+    --color-fg-brand-secondary_alt: #6b6a63;
+    --color-fg-brand-secondary_hover: #82807a;
     --color-fg-error-primary: var(--color-red-500);
-    --color-fg-warning-secondary: var(--color-yellow-400);
     --color-fg-error-secondary: var(--color-red-400);
-    --color-fg-tertiary: var(--color-neutral-400);
-    --color-fg-tertiary_hover: var(--color-neutral-300);
-    --color-fg-brand-primary_alt: var(--color-neutral-300);
-    --color-fg-brand-secondary_alt: var(--color-neutral-600);
-    --color-fg-brand-secondary_hover: var(--color-neutral-500);
+    --color-fg-warning-primary: var(--color-yellow-500);
+    --color-fg-warning-secondary: var(--color-yellow-400);
+    --color-fg-success-primary: var(--color-green-500);
+    --color-fg-success-secondary: var(--color-green-400);
 
-    --color-bg-primary: var(--color-neutral-950);
-    --color-bg-tertiary: var(--color-neutral-800);
-    --color-bg-brand-primary: var(--color-brand-500);
-    --color-bg-error-secondary: var(--color-red-600);
-    --color-bg-warning-primary: var(--color-yellow-950);
-    --color-bg-warning-secondary: var(--color-yellow-600);
-    --color-bg-success-primary: var(--color-green-950);
-    --color-bg-success-secondary: var(--color-green-600);
-    --color-bg-brand-solid: var(--color-brand-600);
-    --color-bg-secondary-solid: var(--color-neutral-600);
-    --color-bg-error-solid: var(--color-red-600);
-    --color-bg-warning-solid: var(--color-yellow-600);
-    --color-bg-success-solid: var(--color-green-600);
-    --color-bg-secondary_hover: var(--color-neutral-800);
-    --color-bg-primary_hover: var(--color-neutral-900);
-    --color-bg-active: var(--color-neutral-800);
-    --color-bg-brand-solid_hover: var(--color-brand-500);
+    /* ---- SEMANTIC BG (DESIGN.md §4-2 dark column) ---- */
+    /*   primary: surface (#1A1C17) — 내 태스크 카드 배경 */
+    /*   secondary: page (#0E0F0C) — 페이지 배경         */
+    /*   tertiary: muted → 외부 이벤트 카드 (alpha)       */
+    /*   quaternary: subtle (#202220) — 섹션 구분        */
+    --color-bg-primary: #1a1c17;
+    --color-bg-secondary: #0e0f0c;
+    --color-bg-tertiary: #202220;
+    --color-bg-quaternary: #2b2d28;
+    --color-bg-primary_alt: #1a1c17;
+    --color-bg-secondary_alt: #1a1c17;
+    --color-bg-primary_hover: #202220;
+    --color-bg-secondary_hover: #2b2d28;
+    --color-bg-active: #2b2d28;
+    --color-bg-brand-primary: #223530; /* DESIGN --brand-subtle dark */
+    --color-bg-brand-primary_alt: #223530;
+    --color-bg-brand-secondary: #2e5849;
+    --color-bg-brand-solid: #6fa58c; /* 다크모드 브랜드는 밝은 sage */
+    --color-bg-brand-solid_hover: #8bb9a3;
+    --color-bg-brand-section: #223530;
+    --color-bg-brand-section_subtle: #2e5849;
+    --color-bg-secondary-solid: #4a4945;
+    --color-bg-primary-solid: #0e0f0c;
+    --color-bg-overlay: #0e0f0c;
     --color-bg-error-primary: var(--color-red-950);
-    --color-bg-brand-secondary: var(--color-brand-600);
-    --color-bg-secondary: var(--color-neutral-900);
-    --color-bg-quaternary: var(--color-neutral-700);
-    --color-bg-primary_alt: var(--color-bg-secondary);
-    --color-bg-brand-primary_alt: var(--color-bg-secondary);
-    --color-bg-secondary_alt: var(--color-bg-primary);
-    --color-bg-overlay: var(--color-neutral-800);
-    --color-bg-brand-section: var(--color-bg-secondary);
-    --color-bg-brand-section_subtle: var(--color-bg-primary);
-    --color-bg-primary-solid: var(--color-bg-secondary);
+    --color-bg-error-secondary: var(--color-red-900);
+    --color-bg-error-solid: var(--color-red-600);
     --color-bg-error-solid_hover: var(--color-red-500);
+    --color-bg-warning-primary: var(--color-yellow-950);
+    --color-bg-warning-secondary: var(--color-yellow-900);
+    --color-bg-warning-solid: var(--color-yellow-600);
+    --color-bg-success-primary: var(--color-green-950);
+    --color-bg-success-secondary: var(--color-green-900);
+    --color-bg-success-solid: var(--color-green-600);
 
+    /* ---- LABEL palette dark overrides (DESIGN.md §4-3) ---- */
+    /*   다크에선 -bg alpha 20%, -fg 값은 밝은 쪽으로 */
+    --color-label-sage: #6fa58c;
+    --color-label-sage-bg: rgba(111, 165, 140, 0.2);
+    --color-label-terracotta: #d68966;
+    --color-label-terracotta-bg: rgba(214, 137, 102, 0.2);
+    --color-label-dust-blue: #87a4be;
+    --color-label-dust-blue-bg: rgba(135, 164, 190, 0.2);
+    --color-label-amber: #d9ac70;
+    --color-label-amber-bg: rgba(217, 172, 112, 0.2);
+    --color-label-plum: #b18597;
+    --color-label-plum-bg: rgba(177, 133, 151, 0.2);
+    --color-label-moss: #a5b57e;
+    --color-label-moss-bg: rgba(165, 181, 126, 0.2);
+
+    /* ---- SHADOWS (DESIGN.md §6-3 dark 3~4배 강화) ---- */
+    --shadow-card:
+      0 1px 2px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.16);
+    --shadow-float:
+      0 4px 16px rgba(58, 110, 91, 0.36), 0 2px 4px rgba(0, 0, 0, 0.24);
+    --shadow-modal:
+      0 20px 60px rgba(0, 0, 0, 0.32), 0 8px 20px rgba(0, 0, 0, 0.16);
+
+    /* ---- COMPONENT tokens ---- */
     --color-app-store-badg-border: var(--color-white);
     --color-avatar-styles-bg-neutral: 224 224 224 1;
     --color-featured-icon-light-fg-brand: var(--color-brand-200);
@@ -769,20 +903,20 @@
     --color-featured-icon-light-fg-success: var(--color-green-200);
     --color-featured-icon-light-fg-warning: var(--color-yellow-200);
     --color-focus-ring-error: var(--color-red-500);
-    --color-focus-ring: var(--color-brand-500);
-    --color-footer-button-fg: var(--color-neutral-300);
-    --color-footer-button-fg_hover: var(--color-neutral-100);
-    --color-icon-fg-brand: var(--color-neutral-400);
-    --color-icon-fg-brand_on-brand: var(--color-neutral-400);
-    --color-screen-mockup-border: var(--color-neutral-700);
-    --color-slider-handle-bg: var(--color-fg-brand-primary);
-    --color-slider-handle-border: var(--color-bg-primary);
+    --color-focus-ring: #6fa58c;
+    --color-footer-button-fg: #c8c6bf;
+    --color-footer-button-fg_hover: #f0eee7;
+    --color-icon-fg-brand: #9b9992;
+    --color-icon-fg-brand_on-brand: #9b9992;
+    --color-screen-mockup-border: #2b2d28;
+    --color-slider-handle-bg: #6fa58c;
+    --color-slider-handle-border: #1a1c17;
     --color-toggle-border: var(--color-transparent);
     --color-toggle-slim-border_pressed-hover: var(--color-transparent);
     --color-toggle-slim-border_pressed: var(--color-transparent);
-    --color-tooltip-supporting-text: var(--color-neutral-300);
+    --color-tooltip-supporting-text: #c8c6bf;
 
-    /* BACKGROUND PROPERTY COLORS */
+    /* ---- LEGACY aliases (dark) ---- */
     --background-color-primary: var(--color-bg-primary);
     --background-color-tertiary: var(--color-bg-tertiary);
     --background-color-brand-primary: var(--color-bg-brand-primary);
@@ -814,12 +948,10 @@
     );
     --background-color-primary-solid: var(--color-bg-primary-solid);
     --background-color-error-solid_hover: var(--color-bg-error-solid_hover);
-
     --background-color-border-brand: var(--color-border-brand);
     --background-color-border-tertiary: var(--color-border-tertiary);
     --background-color-border-brand_alt: var(--color-border-brand_alt);
 
-    /* TEXT PROPERTY COLORS */
     --text-color-primary: var(--color-text-primary);
     --text-color-tertiary: var(--color-text-tertiary);
     --text-color-error-primary: var(--color-text-error-primary);
@@ -845,7 +977,6 @@
     --text-color-brand-secondary_hover: var(--color-text-brand-secondary_hover);
     --text-color-tooltip-supporting-text: var(--color-tooltip-supporting-text);
 
-    /* BORDER PROPERTY COLORS */
     --border-color-primary: var(--color-border-primary);
     --border-color-secondary: var(--color-border-secondary);
     --border-color-secondary_alt: var(--color-border-secondary_alt);
@@ -857,7 +988,6 @@
     --border-color-brand-solid: var(--color-bg-brand-solid);
     --border-color-brand-solid_hover: var(--color-bg-brand-solid_hover);
 
-    /* RING PROPERTY COLORS */
     --ring-color-primary: var(--color-border-primary);
     --ring-color-secondary: var(--color-border-secondary);
     --ring-color-secondary_alt: var(--color-border-secondary_alt);
@@ -869,7 +999,6 @@
     --ring-color-brand-solid_hover: var(--color-bg-brand-solid_hover);
     --ring-color-brand_alt: var(--color-border-brand_alt);
 
-    /* OUTLINE PROPERTY COLORS */
     --outline-color-primary: var(--color-border-primary);
     --outline-color-secondary: var(--color-border-secondary);
     --outline-color-secondary_alt: var(--color-border-secondary_alt);

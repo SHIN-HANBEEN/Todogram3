@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Pretendard Variable self-hosted: 한국어 최적화 본문 폰트 (Todogram v3 Quiet Layer) */
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
 @import './theme.css';
 @import './typography.css';
 

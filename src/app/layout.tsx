@@ -1,15 +1,25 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter } from 'next/font/google'
+import { Instrument_Serif, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import { RouteProvider } from '@/components/providers/route-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 
-// UntitledUI는 Inter 폰트를 기반으로 설계됨
-// --font-inter CSS 변수로 theme.css의 --font-body에 연결됨
-const inter = Inter({
+// Todogram v3 Quiet Layer 폰트 스택
+// - Body: Pretendard Variable (globals.css에서 self-hosted CSS import)
+// - Display: Instrument Serif (display/moments 전용, DESIGN §3)
+// - Mono: JetBrains Mono (tabular-nums 시간/데이터 표기)
+// 각 변수명은 theme.css의 --font-display / --font-mono fallback 체인과 일치해야 함
+const instrumentSerif = Instrument_Serif({
+  subsets: ['latin'],
+  weight: '400',
+  display: 'swap',
+  variable: '--font-instrument-serif',
+})
+
+const jetbrainsMono = JetBrains_Mono({
   subsets: ['latin'],
   display: 'swap',
-  variable: '--font-inter',
+  variable: '--font-jetbrains-mono',
 })
 
 export const metadata: Metadata = {
@@ -30,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="ko"
-      className={`${inter.variable} scroll-smooth`}
+      className={`${instrumentSerif.variable} ${jetbrainsMono.variable} scroll-smooth`}
       suppressHydrationWarning
     >
       <body className="bg-bg-primary antialiased">
