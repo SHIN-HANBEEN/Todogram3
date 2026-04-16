@@ -43,3 +43,5 @@ next-env.d.ts
 # claude / playwright mcp
 .playwright-mcp/
 .claude/settings.local.json
+.claude/worktrees/
+.gstack/
