@@ -30,6 +30,7 @@
   - 파일: `src/db/schema/{users,labels,tasks,task_labels,rollover_logs}.ts`, `drizzle.config.ts`
   - 설계 §8-2 DDL 기반. **`users.timezone TEXT NOT NULL DEFAULT 'Asia/Seoul'` 반드시 추가** (§8-4 cron이 사용)
   - `users.google_auth_status ENUM('active','revoked','expired')` 추가 (revoked 전이용)
+  - `users.task_card_style ENUM('compact','comfortable') NOT NULL DEFAULT 'comfortable'` 추가 (Phase 4 U6 TaskCard 뷰 선택용)
   - `drizzle-kit` migration 파이프라인 구성
 - [ ] **F2. Supabase 프로젝트 생성 + 연결**
   - Supabase 대시보드에서 신규 프로젝트 생성 (무료 티어)
@@ -136,6 +137,7 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - 월 네비게이션 debounce (G3 캐시 활용)
 - [ ] **U2. List View (드래그 정렬 + 필터 + 검색)**
   - 파일: `src/app/(app)/list/page.tsx`, `src/components/task-list/`
+  - 리스트 아이템 = `<TaskCard variant={user.taskCardStyle} />` (U6 컴포넌트 소비)
   - `@dnd-kit/sortable` 또는 유사 라이브러리로 드래그
   - 필터: 상태(pending/in_progress/done) + 라벨 multiselect
   - 검색: title + notes full-text (v1은 단순 ILIKE)
@@ -151,8 +153,33 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - 파일: `src/app/(app)/layout.tsx`
   - **성공 기준**: 모바일에서 콘텐츠 영역 ≥ 65% (설계 §12)
   - UntitledUI sidebar-navigation 또는 header-navigation 선택
-
-**완료 기준**: 모바일 뷰포트에서 Calendar View로 기존 Google 이벤트 + Todogram task 병합 렌더링. task 생성/수정/삭제 E2E 통과.
+- [x] **U0. LabelChip 컴포넌트 (4 variant × 3 size × 6 color)** 🎨 `/design-shotgun` A+B+C+D 승인
+  - 파일: `src/components/todogram/label-chip.tsx`
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/labelchip-variants-20260416/board.html`
+  - **전략**: 맥락별 다른 variant, **default = 'dot' (Things-style)**
+  - **Variant `pill`** — DESIGN.md §4-3 canonical. rounded-full + bg 12%/20% 알파 + full color text. Pretendard 11px/600 uppercase + 0.08em letter-spacing. 용도: 라벨 관리·알림·배지.
+  - **Variant `dot`** (default) — 배경 없음. 6px colored dot + Pretendard 13px/500 sentence case (text-secondary). 용도: TaskCard 인라인 메타. Quiet Layer 정신에 가장 충실.
+  - **Variant `outline`** — rounded-full + 1px solid label-color + 라벨색 텍스트. selected=true 시 bg 12%/20% + weight 600. 용도: 필터바의 탭 가능한 칩.
+  - **Variant `pill-dot`** — pill + 6px leading dot. 색맹 접근성 강화. 용도: 필터바에서 "이 색 = 이 라벨" 두 번 확인.
+  - **공통 props**: `color: 'sage' | 'terracotta' | 'dust-blue' | 'amber' | 'plum' | 'moss'`, `variant`, `size: 'sm' | 'md' | 'lg'`, `selected?`, `onRemove?`, `disabled?`.
+  - **보조 컴포넌트**: `LabelChipButton` (필터바용 interactive wrapper, 터치 타겟 44px+), `LabelChipOverflow` (+N 표시, JetBrains Mono tabular-nums).
+  - **접근성**: `aria-selected` (outline), `aria-pressed` (button), `aria-label="라벨 제거"` (close button), focus-visible outline, `prefers-reduced-motion` 자동 대응(transition 150ms).
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/labelchip-variants-20260416/approved.json` 에 spec 전문 저장.
+- [ ] **U6. TaskCard 컴포넌트 (듀얼 뷰: compact / comfortable)** 🎨 `/design-shotgun` A+B 승인
+  - 파일: `src/components/task-card/task-card.tsx`, `task-card-compact.tsx`, `task-card-comfortable.tsx`, `index.ts`
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/taskcard-variants-20260416/compare.html`
+  - **Variant A — Compact (Minimal Strip)**: 카드 chrome 없음, 4px 좌측 라벨 스트립 + hairline 구분선, 행 높이 56px. 정보 밀도 최고. Things 3 / iOS 네이티브 리스트 느낌.
+  - **Variant B — Comfortable (Soft Card)**: `shadow-card` + `radius-xl(12px)` + 16px padding, 라벨칩 + due time 메타 라인 포함. Noteplan / Sunsama 차분함. **기본값(default).**
+  - **공통 props**: `task: Task & { labels: Label[] }`, `onToggle: (id, status) => void`, `onClick?: (id) => void`
+  - **공통 상태 3종**: `pending` (체크박스 빈칸) / `done` (체크박스 sage 채움 + 제목 취소선) / `rollover` (⟲ 아이콘 + "어제에서 이월" 배지, `task.rolled_from_date` 있을 때)
+  - **공통 접근성**: 카드 전체 클릭 타겟 48px 이상 (DESIGN.md §5 터치 타겟), 체크박스 `aria-checked`, role=button, 키보드 Enter/Space 토글
+  - **밀도 선택 방식**: parent가 `users.task_card_style` 값 읽어 `<TaskCard variant="compact" />` 또는 `variant="comfortable"` prop 전달. default=`'comfortable'`.
+  - **Storybook/테스트**: Vitest snapshot 각 variant × 각 상태 조합 (2 × 3 = 6개), Playwright E2E에서 밀도 토글 → 카드 렌더 변화 검증
+- [ ] **U7. Settings > 뷰 밀도 토글**
+  - 파일: `src/app/(app)/settings/view/page.tsx` (또는 기존 settings 페이지 내 섹션)
+  - UntitledUI `Toggle` 또는 `RadioButtons` (compact / comfortable)
+  - 변경 시 Server Action으로 `users.task_card_style` 업데이트 + `router.refresh()`
+  - 설정 변경 즉시 List View / Calendar View 반영 확인 (SSR 값 전달)
 
 ---
 
