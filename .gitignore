@@ -45,3 +45,7 @@ next-env.d.ts
 .claude/settings.local.json
 .claude/worktrees/
 .gstack/
+
+# gstack 바이너리 (GitHub 100MB 제한 초과) — 각 머신에서 `cd .claude/skills/gstack && ./setup` 로 재생성
+.claude/skills/gstack/bin/*.exe
+.claude/skills/gstack/bin/gstack-global-discover
