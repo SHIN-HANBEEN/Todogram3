@@ -98,7 +98,18 @@ if [ -d ".claude/skills/gstack" ] && [ ! -L ".claude/skills/gstack" ]; then
 fi
 echo "VENDORED_GSTACK: $_VENDORED"
 # Detect spawned session (OpenClaw or other orchestrator)
-[ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true
+[ -n "$OPENCLAW_SESSION" ] && echo "SPAWNED_SESSION: true" || true${ctx.host === 'gbrain' || ctx.host === 'hermes' ? `
+# GBrain health check (gbrain/hermes host only)
+if command -v gbrain &>/dev/null; then
+  _BRAIN_JSON=$(gbrain doctor --fast --json 2>/dev/null || echo '{}')
+  _BRAIN_SCORE=$(echo "$_BRAIN_JSON" | grep -o '"health_score":[0-9]*' | cut -d: -f2)
+  _BRAIN_FAILS=$(echo "$_BRAIN_JSON" | grep -o '"status":"fail"' | wc -l | tr -d ' ')
+  _BRAIN_WARNS=$(echo "$_BRAIN_JSON" | grep -o '"status":"warn"' | wc -l | tr -d ' ')
+  echo "BRAIN_HEALTH: \${_BRAIN_SCORE:-unknown} (\${_BRAIN_FAILS:-0} failures, \${_BRAIN_WARNS:-0} warnings)"
+  if [ "\${_BRAIN_SCORE:-100}" -lt 50 ] 2>/dev/null; then
+    echo "$_BRAIN_JSON" | grep -o '"name":"[^"]*","status":"[^"]*","message":"[^"]*"' || true
+  fi
+fi` : ''}
 \`\`\``;
 }
 
@@ -270,6 +281,14 @@ touch ~/.gstack/.vendoring-warned-\${SLUG:-unknown}
 This only happens once per project. If the marker file exists, skip entirely.`;
 }
 
+function generateBrainHealthInstruction(ctx: TemplateContext): string {
+  if (ctx.host !== 'gbrain' && ctx.host !== 'hermes') return '';
+  return `If \`BRAIN_HEALTH\` is shown and the score is below 50, tell the user which checks
+failed (shown in the output) and suggest: "Run \\\`gbrain doctor\\\` for full diagnostics."
+If the output is not valid JSON or health_score is missing, treat GBrain as unavailable
+and proceed without brain features this session.`;
+}
+
 function generateSpawnedSessionCheck(): string {
   return `If \`SPAWNED_SESSION\` is \`"true"\`, you are running inside a session spawned by an
 AI orchestrator (e.g., OpenClaw). In spawned sessions:
@@ -424,6 +443,21 @@ Use AskUserQuestion:
 **If "Skip":**
 - Continue with the workflow.
 - Note in output: "Pre-existing test failure skipped: <test-name>"`;
+}
+
+function generateConfusionProtocol(): string {
+  return `## Confusion Protocol
+
+When you encounter high-stakes ambiguity during coding:
+- Two plausible architectures or data models for the same requirement
+- A request that contradicts existing patterns and you're unsure which to follow
+- A destructive operation where the scope is unclear
+- Missing context that would change your approach significantly
+
+STOP. Name the ambiguity in one sentence. Present 2-3 options with tradeoffs.
+Ask the user. Do not guess on architectural or data model decisions.
+
+This does NOT apply to routine coding, small features, or obvious changes.`;
 }
 
 function generateSearchBeforeBuildingSection(ctx: TemplateContext): string {
@@ -730,8 +764,9 @@ export function generatePreamble(ctx: TemplateContext): string {
     generateRoutingInjection(ctx),
     generateVendoringDeprecation(ctx),
     generateSpawnedSessionCheck(),
+    generateBrainHealthInstruction(ctx),
     generateVoiceDirective(tier),
-    ...(tier >= 2 ? [generateContextRecovery(ctx), generateAskUserFormat(ctx), generateCompletenessSection()] : []),
+    ...(tier >= 2 ? [generateContextRecovery(ctx), generateAskUserFormat(ctx), generateCompletenessSection(), generateConfusionProtocol()] : []),
     ...(tier >= 3 ? [generateRepoModeSection(), generateSearchBeforeBuildingSection(ctx)] : []),
     generateCompletionStatus(ctx),
   ];
