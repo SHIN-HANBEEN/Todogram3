@@ -184,6 +184,37 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - **접근성**: `nav[aria-label="주요 네비게이션"]`, 활성 `aria-current="page"`, 터치 타겟 48×48 (§9-10), focus-visible sage 링, `motion-reduce:transition-none` (§9-9), 아이콘 `aria-hidden`.
   - **Open questions (v1 구현 중 해결)**: Today 탭 미완료 카운트 뱃지(v1.5로 이월), Today 재탭 시 상단 탭 리셋 여부(기본 리셋 안 함), arrow key 순환(v2 고려).
   - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/bottomnav-variants-20260417/approved.json` 에 spec 전문 저장. rejected variants (A Quiet Icons, B Sage Dot Anchor, D Floating Pill) 사유 기록.
+- [ ] **U0.7. Today View 스크린 (Unified Ledger Layout)** 🎨 `/design-shotgun` D refined v3 승인
+  - 파일: `src/components/todogram/today-view.tsx`, `today-row.tsx`, `filter-rail.tsx`, `rollover-banner.tsx`, `labels.ts`
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/today-view-20260417/iteration-3.html` (확정안), `iteration-1.html` · `iteration-2.html` (진행 기록)
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/today-view-20260417/approved.json` — 전체 spec + decisions log + open questions
+  - **핵심 결정**: 카드 대신 **통합 row ledger**. 내 태스크와 외부 이벤트가 동일한 geometry 를 공유하고, 좌측 3px 색 틱으로 라벨 색을 계승. DESIGN.md §2 "Context-scoped 해석 — Today View row" 참조.
+  - **레이아웃**: `[TodayHeader] → [FilterRail sticky] → [RolloverBanner?] → [stream: TodayRow × n with mid-gap dividers] → [Fab] → [BottomNav]`
+  - **TodayView (container)**:
+    - Props: `{ date: Date; scope: 'today'|'tomorrow'|'week'; items: TodayItem[]; activeFilter: LabelId | 'all' | 'calendar'; rolloverCount?: number; onScopeChange; onFilterChange; onToggleTask; onRolloverAction }`
+    - 스트림은 `items.flatMap((item, i) => i === 0 ? [<TodayRow ... />] : [<Divider />, <TodayRow ... />])` 패턴으로 row 사이에 1px divider 삽입.
+    - divider: `<div class="row-divider" aria-hidden="true" />` — `flex: 0 0 1px; min-height: 1px; background: var(--border-default); margin-left: 3px` (3px 색 틱 공간 스킵). flex-shrink 이슈 때문에 `height:1px` 단독 지정은 금지.
+    - stream 컨테이너: `flex: 1; overflow: hidden auto; padding: 10px 16px 120px; display: flex; flex-direction: column; gap: 4px;` — 4px gap + 1px divider = 9px 중앙 정렬 리듬.
+  - **TodayRow** (내부·외부 공용):
+    - Props: `{ kind: 'mine' | 'ext'; time: string; title: string; label: LabelId | 'calendar'; completed?: boolean; onToggle?: () => void; note?: string }`
+    - Geometry: `[time 56px · check 18px · title flex · chip auto]`, min-height 56px, padding `12px 10px 12px 11px`, `border-left: 3px solid var(--label-color)`, `border-radius: 0 6px 6px 0`.
+    - 내부 / 외부 구분 신호 2개뿐: (a) `kind === 'ext'` 면 체크박스 `visibility: hidden` (공간은 유지), (b) 제목 색 `ext → text-secondary`, `mine → text-primary`.
+    - 시간: JetBrains Mono tabular-nums 13px text-muted.
+    - chip: LabelChip `dot` variant (모바일) — 6px colored dot + 12px 라벨명.
+    - **금지**: dashed border · opacity 0.88 · bg-muted — 이건 카드 형태(ExternalEventCard)에만 유지.
+  - **FilterRail**:
+    - Props: `{ labels: Label[]; active: LabelId | 'all' | 'calendar'; onChange: (v) => void }`
+    - `position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; padding: 10px 16px; overflow-x: auto; background: var(--bg-page); border-bottom: 1px solid var(--border-default); scrollbar-width: none;` + `::-webkit-scrollbar { display: none; }`.
+    - 칩: LabelChip `outline` variant, `selected` 시 `bg 12% + weight 600`. 전체/캘린더/사용자 라벨 순서. `calendar` 는 reserved dust-blue.
+    - 터치 타겟 44px (§5).
+  - **RolloverBanner**:
+    - Props: `{ count: number; onKeep: () => void; onArchive: () => void; onDismiss?: () => void }`
+    - Amber tint 배경 (`bg: #FDF4E2` light / `rgba(217,172,112,0.12)` dark), amber left 3px tick, ⟲ 아이콘.
+    - 2 액션: "오늘 유지" (primary outline sage) / "보관" (ghost text-muted). 카운트 0 이면 렌더 안 함.
+  - **Labels 상수**: `src/components/todogram/labels.ts` 에 `CALENDAR_LABEL_ID = 'calendar'`, `LABEL_COLOR_MAP`, `DEFAULT_USER_LABEL_PRESET = ['work','home','study','personal']` (plum-assigned personal 반영).
+  - **접근성**: row 는 `role="listitem"` + 부모 `role="list" aria-label="오늘 할 일"`, 체크박스 `aria-checked`, FilterRail `role="tablist"` + 칩 `role="tab" aria-selected`, RolloverBanner `role="status" aria-live="polite"`.
+  - **모션**: row hover 시 배경 `bg-bg-primary-hover` 150ms linear. 체크 토글 시 DESIGN.md §7 체크 완료 모션 계승. `motion-reduce:transition-none`.
+  - **Open questions** (구현 중 해결): (1) week scope 시 row 에 날짜 그룹 헤더 필요? (기본 yes), (2) 외부 이벤트 long-press 시 세부 시트 vs 원본 캘린더 앱 deeplink? (v1 = 아무 것도 안 함), (3) filter=calendar 일 때 내 태스크 숨김 여부? (기본 숨김).
 - [ ] **U6. TaskCard 컴포넌트 (듀얼 뷰: compact / comfortable)** 🎨 `/design-shotgun` A+B 승인
   - 파일: `src/components/task-card/task-card.tsx`, `task-card-compact.tsx`, `task-card-comfortable.tsx`, `index.ts`
   - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/taskcard-variants-20260416/compare.html`
