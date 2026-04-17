@@ -165,6 +165,25 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - **보조 컴포넌트**: `LabelChipButton` (필터바용 interactive wrapper, 터치 타겟 44px+), `LabelChipOverflow` (+N 표시, JetBrains Mono tabular-nums).
   - **접근성**: `aria-selected` (outline), `aria-pressed` (button), `aria-label="라벨 제거"` (close button), focus-visible outline, `prefers-reduced-motion` 자동 대응(transition 150ms).
   - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/labelchip-variants-20260416/approved.json` 에 spec 전문 저장.
+- [x] **U0.5. TodayHeader 컴포넌트 (Serif Datestamp + Monolith Tabs)** 🎨 `/design-shotgun` A×D 하이브리드 승인
+  - 파일: `src/components/todogram/today-header.tsx`
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/today-header-20260417/board.html` (A/B/C/D 비교), `iteration-1.html` (확정안)
+  - **Layout (A)**: eyebrow "TODAY"(Pretendard 11px/600/0.08em uppercase) → Instrument Serif 26px 날짜(`text-display-xs`, font-display, 로케일별 포맷 ko="4월 17일 (금)" / en="Friday, 17 April") → 하단 row
+  - **Tabs (D)**: 텍스트 탭 `오늘 · 내일 · 이번 주` / `Today · Tomorrow · This Week`. 비활성 = text-tertiary 500, 활성 = fg-brand-primary 600 + sage underline 1.5px (bottom:12px). 48px 터치 타겟 (DESIGN §5). dot separator `·` 는 aria-hidden.
+  - **Count**: JetBrains Mono 13px tabular-nums `{done}/{total}` (예: `3/7`), text-tertiary. aria-label 로 문장형 전달.
+  - **Props**: `{ date: Date; scope: 'today'|'tomorrow'|'week'; onScopeChange: (s)=>void; completed: number; total: number; locale?: 'ko'|'en'; eyebrow?: string }`
+  - **접근성**: `role="tablist"` + `role="tab"` + `aria-selected` + `aria-controls` (부모가 `id=today-header-panel-{scope}` 패널 렌더 전제), focus-visible outline, `motion-reduce:transition-none` (prefers-reduced-motion 대응 DESIGN §9-9).
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/today-header-20260417/approved.json` 에 spec 전문 저장. rejected variants (A_pure, B, C, D_pure) 사유 기록.
+- [x] **U0.6. BottomNav 컴포넌트 (Monolith Underline)** 🎨 `/design-shotgun` C 승인
+  - 파일: `src/components/todogram/bottom-nav.tsx`
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/bottomnav-variants-20260417/board.html` (A/B/C/D 비교), `iteration-1.html` (확정안 스펙 + props sketch)
+  - **Layout**: `fixed inset-x-0 bottom-0 z-40 md:hidden` · 72px 높이 + `env(safe-area-inset-bottom)` · `bg-bg-primary` + `border-t border-border-primary` + shadow-nav. 태블릿 이상은 sidebar 로 대체(`md:hidden`).
+  - **Tabs (C)**: 4탭 `오늘 · 캘린더 · 라벨 · 설정` / `Today · Calendar · Labels · Settings`. 아이콘 22px stroke 1.75 + 라벨 Pretendard 11px/500. 비활성 = text-tertiary, 활성 = fg-brand-primary 600 + sage underline 28×1.5px (bottom:-2px, `scaleX(0→1)` 220ms ease-in-out). TodayHeader 와 동일한 활성 언어 계승.
+  - **아이콘** (`@untitledui/icons`): `CalendarCheck01`(Today), `Calendar`(Calendar), `Tag01`(Labels), `Settings01`(Settings).
+  - **Props**: `{ locale?: 'ko'|'en'; activeTab?: BottomNavTabId; className?: string }`. activeTab 미지정 시 `usePathname()` + startsWith 매칭으로 자동 판별 — 외부 상태 관리 불필요.
+  - **접근성**: `nav[aria-label="주요 네비게이션"]`, 활성 `aria-current="page"`, 터치 타겟 48×48 (§9-10), focus-visible sage 링, `motion-reduce:transition-none` (§9-9), 아이콘 `aria-hidden`.
+  - **Open questions (v1 구현 중 해결)**: Today 탭 미완료 카운트 뱃지(v1.5로 이월), Today 재탭 시 상단 탭 리셋 여부(기본 리셋 안 함), arrow key 순환(v2 고려).
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/bottomnav-variants-20260417/approved.json` 에 spec 전문 저장. rejected variants (A Quiet Icons, B Sage Dot Anchor, D Floating Pill) 사유 기록.
 - [ ] **U6. TaskCard 컴포넌트 (듀얼 뷰: compact / comfortable)** 🎨 `/design-shotgun` A+B 승인
   - 파일: `src/components/task-card/task-card.tsx`, `task-card-compact.tsx`, `task-card-comfortable.tsx`, `index.ts`
   - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/taskcard-variants-20260416/compare.html`
