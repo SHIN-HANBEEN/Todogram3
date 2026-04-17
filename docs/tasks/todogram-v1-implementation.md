@@ -26,7 +26,7 @@
 
 환경 세팅. 이 단계가 끝나야 실제 기능 개발을 시작할 수 있다.
 
-- [ ] **F1. Drizzle ORM + schema 정의**
+- [x] **F1. Drizzle ORM + schema 정의**
   - 파일: `src/db/schema/{users,labels,tasks,task_labels,rollover_logs}.ts`, `drizzle.config.ts`
   - 설계 §8-2 DDL 기반. **`users.timezone TEXT NOT NULL DEFAULT 'Asia/Seoul'` 반드시 추가** (§8-4 cron이 사용)
   - `users.google_auth_status ENUM('active','revoked','expired')` 추가 (revoked 전이용)
