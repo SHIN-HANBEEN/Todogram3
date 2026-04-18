@@ -158,22 +158,42 @@
 
 여기가 와이프 gate 조건이다. 이 단계가 끝나면 v1 핵심 가치가 증명된다.
 
-- [ ] **G1. Google Cal client + 토큰 자동 갱신**
-  - 파일: `src/lib/google-cal/client.ts`
-  - `googleapis` 패키지 활용
-  - Access token 만료 시 refresh token으로 자동 갱신
-  - 테스트: mock으로 401 → refresh → 재시도 시나리오
-- [ ] **G2. events.list fetch + 페이지네이션**
-  - 파일: `src/lib/google-cal/events.ts`
-  - `timeMin`/`timeMax` 파라미터로 뷰 범위만 요청 (전체 캘린더 금지)
-  - `singleEvents=true` (서버 측 반복 이벤트 expand)
-  - `pageToken` 루프로 250+ 이벤트 전부 수집
-  - `maxResults=250`
-- [ ] **G3. In-memory LRU 캐시 + debounce**
-  - 파일: `src/lib/google-cal/cache.ts`
-  - 캐시 키: `${userId}:${timeMin}:${timeMax}`
-  - 월 네비게이션 debounce 300ms
-  - TTL 5분 (설계 §8-3 백그라운드 refresh 주기)
+- [x] **G1. Google Cal client + 토큰 자동 갱신**
+  - 파일: `src/lib/google-cal/client.ts` (신규 — `createGoogleCalClient` 순수 팩토리 + `getGoogleCalClientForUser` DB 배선 진입점 + `GoogleAuthRevokedError` 도메인 에러), `test/unit/google-cal/client.test.ts` (신규 — 9 케이스)
+  - **`googleapis` 패키지 스킵 결정**: 설계 문서는 패키지 사용을 권고했지만, 실제로 필요한 것은 (1) refresh_token → access_token 재발급(RFC6749 §6) (2) Bearer 헤더 단 fetch 두 가지뿐이다. Google OAuth token endpoint 는 form-urlencoded POST 20줄로 충분하고, 3rd-party SDK 를 mocking 하느니 `fetch` 를 직접 주입해 100% 단위 테스트하는 편이 훨씬 가볍다. G2(events.list) 에서 `OAuth2Client` 가 꼭 필요해지면 그 때 같은 access_token 을 꽂아 쓴다 — access_token 은 표준 Bearer 라 SDK 와 호환된다.
+  - **아키텍처 (DI 우선 설계)**: `createGoogleCalClient({ store, httpFetch?, now? })` 가 순수 함수 팩토리. `store: TokenStore` 는 (a) 캐시 조회 `getCachedAccessToken` (b) 암호화된 refresh_token 로드 `loadRefreshToken` (c) 새 토큰 저장 `saveAccessToken` (d) revoked 전이 훅 `onRevoked` 4개 메서드 인터페이스. 테스트는 mock store + mock fetch 로 전부 커버, 프로덕션은 `getGoogleCalClientForUser(userId)` 가 DB + 모듈 레벨 `Map<userId, {token,expiresAt}>` 으로 store 를 wiring 한다. Phase 3 G4 의 DB 전이 로직은 `onRevoked` 훅에 주입만 하면 끝이라 수정 scope 최소화.
+  - **Access token 캐시 설계**: 모듈 스코프 `inMemoryAccessTokenCache = new Map<number, { token, expiresAt }>`. DB 컬럼 추가 없음 — access_token 은 1시간 ephemeral 이라 Vercel 서버리스 콜드스타트 때 재발급해도 문제 없고, refresh_token 만 DB 에 있으면 복구 가능. 캐시 조회 시 `expiresAt <= now + EXPIRY_SKEW_SECONDS(60)` 이면 만료로 간주하고 preemptive refresh — 네트워크 왕복 중 만료되는 경계 레이스 차단.
+  - **401 자동 재시도 루프**: `client.fetch(url, init)` 가 (1) 캐시 access_token 으로 1차 호출 (2) 401 반환 시 **정확히 1번만** refresh 후 재시도 (3) 재시도도 실패면 그대로 반환. 2회 연속 401 이면 토큰 교체로 해결 불가능한 상황(권한 변경·revoke)이라 루프 대신 호출자에게 위임. `withBearerAuth()` 헬퍼가 Headers 원본을 보존하면서 Authorization 만 교체해 기존 헤더(e.g. `If-Modified-Since`) 유실 방지.
+  - **`invalid_grant` → `GoogleAuthRevokedError` 전이**: refresh 응답이 400 + body.error === 'invalid_grant' 인 경우만 도메인 에러 throw. `onRevoked()` 훅은 이 에러 경로에서만 호출되고, hook 자체의 예외는 swallow(catch 후 무시) 해 원래 `GoogleAuthRevokedError` 가 묻히지 않도록 보장. 다른 원인(네트워크/500/invalid_request)은 generic `Error` 로 남겨 호출자가 재시도 정책을 결정하게 한다.
+  - **테스트 커버리지 (9/9 green)**: (1) 캐시 히트 시 refresh 생략, (2) 캐시 만료 시 refresh 후 Bearer 부착, (3) 60초 skew 선제 refresh, (4) refresh 후 access_token 캐시 저장, (5) 401 → refresh → 재시도 성공, (6) 2회 연속 401 시 재시도 1회만, (7) `invalid_grant` → `GoogleAuthRevokedError` + `onRevoked` 호출, (8) `onRevoked` 자체 예외는 swallow, 원래 에러 전파, (9) 커스텀 헤더 보존 검증. `vi.fn<typeof fetch>()` 제네릭으로 mock 타입 좁혀 `as unknown as typeof fetch` 캐스팅 제거.
+  - **TDD 준수**: test 먼저 작성 → `Module not found` RED 확인 → 구현으로 GREEN 전환 → prettier 정리. Red-Green-Refactor 사이클 명시적으로 수행.
+  - **남은 작업 (G2/G3/G4)**: `events.list` + 페이지네이션 루프는 G2 가 `src/lib/google-cal/events.ts` 에 별도 모듈로 추가(이 클라이언트의 `fetch` 만 소비). TTL 5분 LRU + 월 네비게이션 debounce 는 G3 가 `cache.ts` 로 분리. G4 는 `getGoogleCalClientForUser` 의 `onRevoked` 훅을 `db.update(users).set({ googleAuthStatus: 'revoked' })` 로 채우기만 하면 됨 — 현재는 `TODO(G4)` 주석으로 핀 박아둔 상태.
+  - 검증: `npm run typecheck` ✅ · `npm run test` 181 green (172 기존 + 9 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --write` 통과 ✅
+- [x] **G2. events.list fetch + 페이지네이션**
+  - 파일: `src/lib/google-cal/events.ts` (신규 — `listCalendarEvents` + `GoogleCalendarEvent` 타입), `test/unit/google-cal/events.test.ts` (신규 — 11 케이스)
+  - **G1 과의 관심사 분리**: 인증/토큰 refresh/401 재시도/revoked 승격은 전부 G1 의 `GoogleCalClient.fetch` 가 책임진다. G2 는 순수하게 "URL 조립 + 페이지 루프 + 응답 병합" 만 수행 — 단일 진입점 `listCalendarEvents(client, { timeMin, timeMax })` 가 전부. 클라이언트를 DI 로 받아서 단위 테스트에서는 `vi.fn` mock 으로, G3 캐시 레이어에서는 `getGoogleCalClientForUser` 결과로 바로 주입할 수 있다.
+  - **엔드포인트 고정 (`/calendars/primary/events`)**: 설계 §8-3 에 따라 v1 은 로그인 계정의 primary 캘린더만 읽는다. `/users/me/calendarList` 같은 전체 캘린더 루트는 절대 호출하지 않음 — 권한 스코프(readonly events) 와 정합, API 쿼터 예측 가능. 멀티 캘린더가 필요해지면 `calendarId` 옵션을 추가하는 최소 변경으로 확장 가능.
+  - **필수 쿼리 4종 고정**: `timeMin` / `timeMax` (RFC3339, `Date.toISOString()`) + `singleEvents=true` (서버 측 반복 이벤트 전개 — 클라이언트 RRULE 파서 복잡도 회피) + `maxResults=250` (페이지당 상한, Google 기본값과 동일하지만 명시해 회귀 방지). `URLSearchParams` 로 조립해 키 순서/인코딩이 안정적으로 재현되도록 함.
+  - **페이지네이션 루프**: 첫 호출은 `pageToken` 없이, 이후 응답의 `nextPageToken` 을 실어 재요청. `items` 는 페이지 순서대로 `collected[]` 에 누적 (스택 오버플로 방지 위해 `push(...items)` 스프레드 대신 `for-of` 로 원소 누적). 종료 조건 두 개: (1) `nextPageToken` 부재 시 정상 종료, (2) 동일 토큰 반복 시 서버 버그로 간주해 즉시 throw — 무한 루프 + API 과금 방지. 추가 안전망으로 loop counter 10000 초과 시 abort.
+  - **방어적 입력 가드**: `timeMin` / `timeMax` 가 Date 객체가 아니거나 Invalid Date 이면 네트워크로 나가지 않고 throw. `timeMin >= timeMax` 도 동일 — Google 이 어차피 400 을 돌려주지만 실수 가드를 상위에 두는 편이 호출자 입장에서 더 명확하고, mock 단위 테스트에서도 네트워크 경로 분기를 덜어준다.
+  - **에러 경로 설계**: 200 이 아닌 응답은 `status + 본문 앞 200자` 를 담은 generic `Error` 로 throw — G1 이 이미 발생시키는 `GoogleAuthRevokedError` 와 "호출자가 재시도 여부를 결정할 일반 오류(5xx/403/quota)" 를 타입으로 구분하기 위함. `client.fetch` 자체가 throw 하는 `GoogleAuthRevokedError` 는 손대지 않고 그대로 전파 (G4 가 DB 전이로 이어받을 수 있도록).
+  - **타입 설계 (`GoogleCalendarEvent`)**: Google API 전체 스키마를 중복 정의하지 않고, v1 에서 소비할 필드(`id`, `summary`, `start/end`, `status`, `location` 등) 만 얇게 타이핑 + `[key: string]: unknown` index signature 로 알려지지 않은 필드는 흘려보낸다. 유지보수 부담 최소화 + 실제로 꺼내 쓰는 필드만 타입 안전. start/end 는 종일 이벤트(`date`) 와 시각 지정 이벤트(`dateTime`) 가 공존해서 union 대신 옵셔널로 표현 — U1 Calendar View 가 둘 다 수용해야 하므로.
+  - **테스트 커버리지 (11/11 green)**: (1) primary 엔드포인트 + 4개 필수 쿼리 정확히 전송, (2) GET + body 없음 (G1 에 auth 위임 확인), (3) nextPageToken 없는 단일 페이지는 1회만 호출 + items 그대로 반환, (4) 빈 items 정상 처리, (5) 3페이지 시나리오에서 pageToken 체인이 이어지고 전체 items 가 순서대로 병합, (6) 루프 중에도 timeMin/timeMax/singleEvents/maxResults 유지, (7) 동일 pageToken 반복 시 throw (무한 루프 가드), (8) 500 응답 시 status 포함 throw, (9) 403 응답도 동일 generic Error 로 throw (revoked 와 구분), (10) `client.fetch` 가 `GoogleAuthRevokedError` throw 시 그대로 전파, (11) `timeMin >= timeMax` 면 네트워크 안 나가고 바로 throw.
+  - **TDD 준수**: test 먼저 작성 → `Failed to resolve import "@/lib/google-cal/events"` RED 확인 → 구현으로 GREEN 전환 → prettier/eslint 정리. Red-Green-Refactor 사이클 명시적으로 수행.
+  - **남은 작업 (G3/G4)**: TTL 5분 LRU 캐시 + 월 네비게이션 300ms debounce 는 G3 가 `src/lib/google-cal/cache.ts` 에서 이 함수를 한 겹 래핑한다 (캐시 키 = `${userId}:${timeMin}:${timeMax}`). G4 는 `client.ts` 의 `onRevoked` 훅을 DB 업데이트(`users.google_auth_status='revoked'`) 로 채우기만 하면 끝 — `listCalendarEvents` 는 G4 가 throw 하는 `GoogleAuthRevokedError` 를 이미 투명하게 전파하도록 설계되어 있어 수정 불필요.
+  - 검증: `npm run typecheck` ✅ · `npm run test` 192 green (181 기존 + 11 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --check` 통과 ✅
+- [x] **G3. In-memory LRU 캐시 + debounce**
+  - 파일: `src/lib/google-cal/cache.ts` (신규 — `createEventCache` + `createDebouncedFetcher` + `buildEventCacheKey` + 상수 `EVENT_CACHE_TTL_MS` / `EVENT_CACHE_DEFAULT_MAX_ENTRIES` / `EVENT_DEBOUNCE_DEFAULT_MS`), `test/unit/google-cal/cache.test.ts` (신규 — 23 케이스)
+  - **G1/G2 와의 관심사 분리**: 인증/토큰 refresh/401 재시도는 G1, URL 조립/페이지네이션은 G2 가 이미 책임지고 있어 G3 는 "네트워크는 끝났다고 가정" 하고 그 앞단에서 (1) 캐시 (2) debounce 만 얹는다. 두 유틸을 분리해 노출하면 호출자가 필요에 따라 조합(UI debounce → 캐시 확인 → fetch → 캐시 저장) 할 수 있다.
+  - **캐시 키 직렬화 (`buildEventCacheKey`)**: `${userId}:${timeMin.toISOString()}:${timeMax.toISOString()}` 포맷. `toISOString()` 은 항상 UTC 확장 포맷이라 시계/로케일에 독립적 — 같은 순간을 가리키는 Date 는 언제나 동일 키가 되어 적중률이 안정적이다. userId 를 맨 앞에 두어 디버깅 시 prefix 로 사용자별 엔트리를 골라내기 쉽도록.
+  - **LRU + TTL 구현 (`createEventCache`)**: 별도 LRU 라이브러리를 들이지 않고 `Map` 의 insertion-order 불변 사양을 활용 — `get` 적중 시 해당 키를 `delete` → `set` 재삽입해 "가장 최근" 위치로 옮기고, 용량 초과 시 `keys().next().value`(가장 오래된 키) 를 O(1) 로 축출. TTL 은 lazy 만료 — 타이머를 돌리지 않고 `get` 호출 시점에 `now() >= expiresAt` 이면 엔트리를 제거하고 null 반환. 서버리스 환경에서 백그라운드 타이머로 인한 프로세스 고정(pin) 을 피할 수 있다. 기본값: TTL 5분(설계 §8-3), maxEntries 32(1인 월 네비게이션 대표 워크로드 커버). `events` 는 set/get 양쪽에서 spread 로 방어적 복사 — 호출자가 배열을 mutate 해도 캐시가 오염되지 않는다.
+  - **Debounce coalescing 의미론 (`createDebouncedFetcher`)**: "전역 debounce" — 한 인스턴스 안에서 `delayMs`(기본 300ms) 이내 연속 호출되면 **오직 마지막 load 만** 실제로 실행되고, 대기 중이던 모든 promise 는 그 최종 결과로 동일하게 resolve/reject. 월 네비게이션 UX 관점에서 정당화 — 사용자가 →→→ 로 빠르게 넘기면 중간 월은 어차피 화면에 안 보이니 fetch 할 필요가 없고, 호출자(useEffect)가 "superseded" 에러를 따로 처리하지 않아도 되도록 마지막 결과로 단일 resolution.
+  - **async 오류 경로 방어**: `runLoad()` 가 **동기적으로** throw 하는 경우까지 잡기 위해 try/catch 를 감싼 뒤 promise chain. Promise chain 안에서 reject 된 에러도 동일하게 모든 대기 promise 로 전파. 타이머 fire 시점에 `latestLoad`/`pending` 을 로컬로 스냅샷한 뒤 인스턴스 상태를 초기화해 **다음 호출이 즉시 새 사이클을 시작** 할 수 있도록 — 이전 실행이 여전히 pending 이어도 새 debounce 사이클이 독립적으로 동작한다.
+  - **timer DI 설계**: `setTimeoutFn` / `clearTimeoutFn` 을 옵션으로 받아 Vitest 의 글로벌 fake timer 대신 테스트가 직접 제어한 controlled timer 를 주입. 장점 — (1) 다른 테스트와의 글로벌 timer 오염 격리, (2) 정확히 어떤 시점에 `clearTimeoutFn` 이 몇 번 호출되는지 스파이 가능, (3) 테스트 병렬 실행 안전. 프로덕션 경로는 기본값(`setTimeout`/`clearTimeout`) 사용.
+  - **테스트 커버리지 (23/23 green)**: (1) `buildEventCacheKey` 안정성 4 케이스 (직렬화 포맷 · 동일 입력 동일 키 · userId 격리 · 범위 차이), (2) 캐시 기본 동작 5 케이스 (미스 → null · round-trip · userId 격리 · upsert · clear/size), (3) TTL 만료 3 케이스 (정확히 경계까지 유효 · 만료 후 null · lazy 제거로 size 감소 · `EVENT_CACHE_TTL_MS === 5분` 상수 락), (4) LRU 축출 3 케이스 (가장 오래된 축출 · `get` 이 recency 갱신 · 동일 키 `set` 이 recency 리셋), (5) debounce 기본 2 케이스 (delayMs 뒤 load 실행 · reject 전파), (6) coalescing 3 케이스 (마지막 load 만 실행 · 모두 동일 reject · 타이머 fire 후 새 사이클 독립), (7) 타이머 위생 1 케이스 (이전 타이머 `clearTimeoutFn` 으로 정리 — 2/3번째 호출에서 정확히 2번 호출), (8) 상수 노출 2 케이스 (`EVENT_DEBOUNCE_DEFAULT_MS === 300` · `EVENT_CACHE_DEFAULT_MAX_ENTRIES` 양의 정수 · 8 이상).
+  - **TDD 준수**: test 먼저 작성 → `Failed to resolve import "@/lib/google-cal/cache"` RED 확인 → 구현으로 GREEN 전환 → ESLint 0 에러 · Prettier pass. Red-Green-Refactor 사이클 명시적 수행.
+  - **남은 작업 (G4 / U1)**: G4 에서 `revoked` 전이 시 `cache.clear()` 를 호출해 stale 이벤트가 UI 에 남지 않도록 연결. U1 Calendar View 가 이 유틸을 실제로 소비 — 월 변경 → debounced(load) → 캐시 확인 → 미스 시 `listCalendarEvents` → `cache.set` 순서로 조립.
+  - 검증: `npm run typecheck` ✅ · `npm run test` 215 green (192 기존 + 23 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --check` 통과 ✅
 - [ ] **G4. 401 revoked → user status 전이**
   - 파일: `src/lib/google-cal/client.ts` 확장
   - 토큰 취소 감지 시 `users.google_auth_status = 'revoked'` 업데이트
