@@ -1,3 +1,4 @@
+import { eq } from 'drizzle-orm'
 import NextAuth from 'next-auth'
 import { cookies } from 'next/headers'
 
@@ -75,7 +76,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             ? rawTimezone
             : undefined
 
-          await db
+          // Phase 2 - D1 — upsert 결과의 PK 를 JWT 에 보존해, 이후 Server Action 의
+          // ownership 가드(`WHERE user_id = session.user.id`) 가 매 요청마다 DB 조회를 다시
+          // 하지 않도록 한다. ON CONFLICT DO UPDATE 는 PostgreSQL 에서 충돌 시에도 RETURNING
+          // 으로 갱신된 row 를 돌려주므로 신규/재로그인 모두 동일한 코드 경로로 id 확보.
+          const [upserted] = await db
             .insert(users)
             .values({
               email: token.email,
@@ -94,6 +99,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 // timezone 은 의도적으로 set 에 포함하지 않는다 (최초 1회 정책).
               },
             })
+            .returning({ id: users.id })
+
+          if (upserted?.id) {
+            token.userId = upserted.id
+          }
+        }
+      }
+      // Phase 2 - D1 안전망 — 코드 변경 이전에 발급된 세션은 token.userId 가 비어 있을 수
+      // 있다. 그 경우 email 로 1회 조회해 채워둔다. 정상 경로(account 존재)는 위에서 이미 채웠으므로
+      // 여기는 'stale JWT 한정 lazy backfill' 이며 매 요청 DB 조회를 발생시키지 않는다.
+      if (!token.userId && typeof token.email === 'string' && token.email) {
+        const existing = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, token.email))
+          .limit(1)
+        if (existing[0]?.id) {
+          token.userId = existing[0].id
         }
       }
       // TODO(G1): token.expires_at 이 만료되면 refresh_token 으로 재발급.

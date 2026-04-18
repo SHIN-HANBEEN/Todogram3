@@ -20,9 +20,21 @@ import { env } from '@/env'
 // JWT 에 담길 커스텀 필드를 v5 의 선언 병합으로 타입까지 넓혀둔다.
 // 원래 auth.ts 에 있던 선언을 여기로 옮겨서 middleware 경로도 동일 타입을 인식하게 한다.
 declare module 'next-auth' {
-  /** 세션 에러 채널 — Phase 3 G4 에서 'RefreshTokenError' 전이 시 UI 가 재로그인 유도. */
   interface Session {
+    /** 세션 에러 채널 — Phase 3 G4 에서 'RefreshTokenError' 전이 시 UI 가 재로그인 유도. */
     error?: 'RefreshTokenError'
+    /**
+     * 우리 DB 의 users.id (SERIAL 정수). Phase 2 - D1 부터 Server Action 들이
+     * `WHERE user_id = session.dbUserId` 가드를 걸 때 사용한다.
+     *
+     * 왜 `userId` 가 아니라 `dbUserId` 인가:
+     *  - NextAuth v5 의 callback 시그니처는 JWT 전략과 Database 전략 타입의 intersection 이라
+     *    `AdapterSession.userId: string` 이 항상 끼어든다. 같은 키를 number 로 재선언하면
+     *    intersection 이 `userId: never` 로 collapse 해 콜백에서 대입이 불가능해진다.
+     *  - 키 이름을 `dbUserId` 로 분리해 충돌을 원천 차단. JWT 쪽은 이런 교차가 없어 그대로 `userId`.
+     *  - 왜 `session.user.id` 도 안 되는가: `User.id` 가 `string` 이라 같은 사유로 collapse.
+     */
+    dbUserId?: number
   }
 }
 
@@ -36,6 +48,13 @@ declare module 'next-auth/jwt' {
     refresh_token?: string
     /** 에러 상태. 401/invalid_grant 등으로 refresh 실패 시 설정. */
     error?: 'RefreshTokenError'
+    /**
+     * 우리 DB 의 users.id (SERIAL 정수). Phase 2 - D1 부터 모든 Server Action 의
+     * ownership 가드(`WHERE user_id = ?`) 가 이 값을 참조한다. 최초 로그인 시 auth.ts 의
+     * jwt 콜백이 upsert 결과의 `.returning({ id })` 로 채운다. 이후 요청에서는 이미 채워진
+     * token 을 그대로 사용하므로 매 요청마다 DB 조회가 발생하지 않는다.
+     */
+    userId?: number
   }
 }
 
@@ -89,6 +108,12 @@ export const authConfig = {
      */
     async session({ session, token }) {
       session.error = token.error
+      // Phase 2 - D1 — Server Action 의 ownership 가드용으로 DB 사용자 PK 를 노출.
+      // 토큰에 userId 가 없는 경로(아주 오래된 세션 등)는 그대로 둔다 — 그 경우 requireUserId() 가
+      // 명시적으로 거부해 재로그인을 유도한다. 절대 0 같은 디폴트로 메우지 않는다(타 사용자 데이터 침범 위험).
+      if (typeof token.userId === 'number') {
+        session.dbUserId = token.userId
+      }
       return session
     },
   },
