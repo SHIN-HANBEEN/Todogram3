@@ -1,7 +1,14 @@
+import { loadEnvConfig } from '@next/env'
 import { defineConfig } from 'drizzle-kit'
 
 // drizzle-kit CLI 에서 사용하는 설정 (`npm run db:generate`, `db:migrate`, `db:push`, `db:studio`).
 // Next.js 런타임이 아니라 Node CLI 컨텍스트라서 여기서는 process.env 를 직접 읽는다.
+//
+// `@next/env` 로 Next.js 와 동일한 우선순위(.env.local > .env.development > .env) 로 환경변수를
+// 로드한다. 이렇게 해야 `npm run dev` 와 `npm run db:migrate` 가 같은 설정을 공유해
+// "런타임에서는 Supabase 에 붙는데 migration 이 안 붙는" 류의 혼란을 방지한다.
+loadEnvConfig(process.cwd())
+
 // DATABASE_URL 은 Phase 0-F2 단계에서 Supabase 연결 문자열로 채운다 (없어도 schema 파싱/generate 는 동작).
 const databaseUrl = process.env.DATABASE_URL ?? ''
 

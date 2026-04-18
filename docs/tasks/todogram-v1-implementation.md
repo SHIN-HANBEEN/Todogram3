@@ -32,10 +32,12 @@
   - `users.google_auth_status ENUM('active','revoked','expired')` 추가 (revoked 전이용)
   - `users.task_card_style ENUM('compact','comfortable') NOT NULL DEFAULT 'comfortable'` 추가 (Phase 4 U6 TaskCard 뷰 선택용)
   - `drizzle-kit` migration 파이프라인 구성
-- [ ] **F2. Supabase 프로젝트 생성 + 연결**
-  - Supabase 대시보드에서 신규 프로젝트 생성 (무료 티어)
-  - `src/db/index.ts`에 `drizzle(postgres(process.env.DATABASE_URL!))` 클라이언트
-  - 초기 migration 실행 → Supabase 테이블 생성 확인
+- [x] **F2. Supabase 프로젝트 생성 + 연결**
+  - Supabase 대시보드에서 신규 프로젝트 생성 (무료 티어, ap-northeast-2 Seoul)
+  - `src/db/index.ts`에 `drizzle(postgres(process.env.DATABASE_URL!))` 클라이언트 — pgBouncer 호환 `prepare: false`, HMR 캐싱, schema 배럴 등록
+  - `drizzle.config.ts` 에서 `@next/env.loadEnvConfig()` 로 `.env.local` 자동 로드 (런타임/CLI env 통일)
+  - `.env.example` + `.env.local` 스캐폴드 (Phase 0~5 env 전부 문서화)
+  - `npm run db:migrate` 실행 → `__drizzle_migrations` + `users` + `labels` + `tasks` + `task_labels` + `rollover_logs` 6 테이블 생성 확인
 - [ ] **F3. 테스트 프레임워크 세팅 (Vitest + Playwright)**
   - `vitest.config.ts` + `test/unit/`, `test/integration/`
   - `playwright.config.ts` + `test/e2e/`
