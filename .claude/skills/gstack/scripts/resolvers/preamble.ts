@@ -1,5 +1,8 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import type { TemplateContext } from './types';
 import { getHostConfig } from '../../hosts/index';
+import { generateQuestionTuning } from './question-tuning';
 
 /**
  * Preamble architecture — why every skill needs this
@@ -53,6 +56,16 @@ _TEL_START=$(date +%s)
 _SESSION_ID="$$-$(date +%s)"
 echo "TELEMETRY: \${_TEL:-off}"
 echo "TEL_PROMPTED: $_TEL_PROMPTED"
+# Question tuning (opt-in; see /plan-tune + docs/designs/PLAN_TUNING_V0.md)
+_QUESTION_TUNING=$(${ctx.paths.binDir}/gstack-config get question_tuning 2>/dev/null || echo "false")
+echo "QUESTION_TUNING: $_QUESTION_TUNING"
+# Writing style (V1: default = ELI10-style, terse = V0 prose. See docs/designs/PLAN_TUNING_V1.md)
+_EXPLAIN_LEVEL=$(${ctx.paths.binDir}/gstack-config get explain_level 2>/dev/null || echo "default")
+if [ "$_EXPLAIN_LEVEL" != "default" ] && [ "$_EXPLAIN_LEVEL" != "terse" ]; then _EXPLAIN_LEVEL="default"; fi
+echo "EXPLAIN_LEVEL: $_EXPLAIN_LEVEL"
+# V1 upgrade migration pending-prompt flag
+_WRITING_STYLE_PENDING=$([ -f ~/.gstack/.writing-style-prompt-pending ] && echo "yes" || echo "no")
+echo "WRITING_STYLE_PENDING: $_WRITING_STYLE_PENDING"
 mkdir -p ~/.gstack/analytics
 if [ "$_TEL" != "off" ]; then
 echo '{"skill":"${ctx.skillName}","ts":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'","repo":"'$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" 2>/dev/null || echo "unknown")'"}'  >> ~/.gstack/analytics/skill-usage.jsonl 2>/dev/null || true
@@ -126,6 +139,31 @@ of \`/qa\`, \`/gstack-ship\` instead of \`/ship\`). Disk paths are unaffected �
 \`${ctx.paths.skillRoot}/[skill-name]/SKILL.md\` for reading skill files.
 
 If output shows \`UPGRADE_AVAILABLE <old> <new>\`: read \`${ctx.paths.skillRoot}/gstack-upgrade/SKILL.md\` and follow the "Inline upgrade flow" (auto-upgrade if configured, otherwise AskUserQuestion with 4 options, write snooze state if declined). If \`JUST_UPGRADED <from> <to>\`: tell user "Running gstack v{to} (just updated!)" and continue.`;
+}
+
+function generateWritingStyleMigration(ctx: TemplateContext): string {
+  return `If \`WRITING_STYLE_PENDING\` is \`yes\`: You're on the first skill run after upgrading
+to gstack v1. Ask the user once about the new default writing style. Use AskUserQuestion:
+
+> v1 prompts = simpler. Technical terms get a one-sentence gloss on first use,
+> questions are framed in outcome terms, sentences are shorter.
+>
+> Keep the new default, or prefer the older tighter prose?
+
+Options:
+- A) Keep the new default (recommended — good writing helps everyone)
+- B) Restore V0 prose — set \`explain_level: terse\`
+
+If A: leave \`explain_level\` unset (defaults to \`default\`).
+If B: run \`${ctx.paths.binDir}/gstack-config set explain_level terse\`.
+
+Always run (regardless of choice):
+\`\`\`bash
+rm -f ~/.gstack/.writing-style-prompt-pending
+touch ~/.gstack/.writing-style-prompted
+\`\`\`
+
+This only happens once. If \`WRITING_STYLE_PENDING\` is \`no\`, skip this entirely.`;
 }
 
 function generateLakeIntro(): string {
@@ -310,6 +348,41 @@ function generateAskUserFormat(_ctx: TemplateContext): string {
 Assume the user hasn't looked at this window in 20 minutes and doesn't have the code open. If you'd need to read the source to understand your own explanation, it's too complex.
 
 Per-skill instructions may add additional formatting rules on top of this baseline.`;
+}
+
+function loadJargonList(): string[] {
+  const jargonPath = path.join(__dirname, '..', 'jargon-list.json');
+  try {
+    const raw = fs.readFileSync(jargonPath, 'utf-8');
+    const data = JSON.parse(raw);
+    if (Array.isArray(data?.terms)) return data.terms.filter((t: unknown): t is string => typeof t === 'string');
+  } catch {
+    // Missing or malformed: fall back to empty list. Writing Style block still fires,
+    // but with no terms to gloss — graceful degradation.
+  }
+  return [];
+}
+
+function generateWritingStyle(_ctx: TemplateContext): string {
+  const terms = loadJargonList();
+  const jargonBlock = terms.length > 0
+    ? `**Jargon list** (gloss each on first use per skill invocation, if the term appears in your output):\n\n${terms.map(t => `- ${t}`).join('\n')}\n\nTerms not on this list are assumed plain-English enough.`
+    : `**Jargon list:** (not loaded — \`scripts/jargon-list.json\` missing or malformed). Skip the jargon-gloss rule until the list is restored.`;
+
+  return `## Writing Style (skip entirely if \`EXPLAIN_LEVEL: terse\` appears in the preamble echo OR the user's current message explicitly requests terse / no-explanations output)
+
+These rules apply to every AskUserQuestion, every response you write to the user, and every review finding. They compose with the AskUserQuestion Format section above: Format = *how* a question is structured; Writing Style = *the prose quality of the content inside it*.
+
+1. **Jargon gets a one-sentence gloss on first use per skill invocation.** Even if the user's own prompt already contained the term — users often paste jargon from someone else's plan. Gloss unconditionally on first use. No cross-invocation memory: a new skill fire is a new first-use opportunity. Example: "race condition (two things happen at the same time and step on each other)".
+2. **Frame questions in outcome terms, not implementation terms.** Bad: "Is this endpoint idempotent?" Good: "If someone double-clicks the button, is it OK for the action to run twice?" Ask the question the user would actually want to answer.
+3. **Short sentences. Concrete nouns. Active voice.** Standard advice from any good writing guide. Prefer "the cache stores the result for 60s" over "results will have been cached for a period of 60s."
+4. **Close every decision with user impact.** Connect the technical call back to who's affected. "If we skip this, your users will see a 3-second spinner on every page load." Make the user's user real.
+5. **User-turn override.** If the user's current message says "be terse" / "no explanations" / "brutally honest, just the answer" / similar, skip this entire Writing Style block for your next response, regardless of config. User's in-turn request wins.
+6. **Glossary boundary is the curated list.** Terms below get glossed. Terms not on the list are assumed plain-English enough. If you see a term that genuinely needs glossing but isn't listed, note it (once) in your response so it can be added via PR.
+
+${jargonBlock}
+
+Terse mode (EXPLAIN_LEVEL: terse): skip this entire section. Emit output in V0 prose style — no glosses, no outcome-framing layer, shorter responses. Power users who know the terms get tighter output this way.`;
 }
 
 function generateCompletenessSection(): string {
@@ -758,6 +831,7 @@ export function generatePreamble(ctx: TemplateContext): string {
   const sections = [
     generatePreambleBash(ctx),
     generateUpgradeCheck(ctx),
+    generateWritingStyleMigration(ctx),
     generateLakeIntro(),
     generateTelemetryPrompt(ctx),
     generateProactivePrompt(ctx),
@@ -766,7 +840,8 @@ export function generatePreamble(ctx: TemplateContext): string {
     generateSpawnedSessionCheck(),
     generateBrainHealthInstruction(ctx),
     generateVoiceDirective(tier),
-    ...(tier >= 2 ? [generateContextRecovery(ctx), generateAskUserFormat(ctx), generateCompletenessSection(), generateConfusionProtocol()] : []),
+    ...(tier >= 2 ? [generateContextRecovery(ctx), generateAskUserFormat(ctx), generateWritingStyle(ctx), generateCompletenessSection(), generateConfusionProtocol()] : []),
+    ...(tier >= 2 ? [generateQuestionTuning(ctx)] : []),
     ...(tier >= 3 ? [generateRepoModeSection(), generateSearchBeforeBuildingSection(ctx)] : []),
     generateCompletionStatus(ctx),
   ];
