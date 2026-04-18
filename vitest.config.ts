@@ -32,5 +32,11 @@ export default defineConfig({
     ],
     // E2E(Playwright)·node_modules·빌드 산출물은 Vitest 가 절대 건드리지 않도록 명시.
     exclude: ['test/e2e/**', 'node_modules/**', '.next/**', 'dist/**'],
+    // 테스트 런타임에 주입할 환경변수. 실제 시크릿 없이도 `@/env` 모듈이 import 가능하도록
+    // 검증 스킵 플래그를 켠다 (Phase 0 - F4). 각 테스트가 env 검증 로직을 직접 확인하려면
+    // `parseEnv(mockedSource)` 를 명시적으로 호출하면 된다.
+    env: {
+      SKIP_ENV_VALIDATION: '1',
+    },
   },
 })

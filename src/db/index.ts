@@ -1,6 +1,8 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 
+import { env } from '@/env'
+
 import * as schema from './schema'
 
 // ============================================================================
@@ -17,15 +19,10 @@ import * as schema from './schema'
 //   반드시 `prepare: false` 를 넘겨야 한다. 안 그러면 첫 쿼리에서 터진다.
 // ============================================================================
 
-// DATABASE_URL 부재 시 바로 예외 — 의도를 숨기고 런타임 쿼리에서 undefined 에러로
-// 터지는 것보다, 서버 부트스트랩 시점에 명시적으로 실패하는 편이 디버깅이 쉽다.
-// Phase 0 - F4 에서 Zod 검증으로 교체될 예정이지만 지금은 최소 가드.
-const databaseUrl = process.env.DATABASE_URL
-if (!databaseUrl) {
-  throw new Error(
-    'DATABASE_URL 환경변수가 설정되지 않았습니다. .env.local 에 Supabase 연결 문자열을 채워주세요.',
-  )
-}
+// DATABASE_URL 은 `@/env` 모듈이 Zod 로 일괄 검증해 타입 안전하게 제공한다.
+// (Phase 0 - F4) 여기서는 그 값을 그대로 사용한다. 누락되거나 스킴이 틀리면
+// `@/env` import 시점에 이미 throw 되므로 런타임 쿼리에서 undefined 가 새어 나올 일이 없다.
+const databaseUrl = env.DATABASE_URL
 
 // Next.js 개발 모드(HMR) 에서는 모듈이 반복 재평가되면서 postgres 커넥션이 누적될 수 있다.
 // globalThis 캐시로 단일 클라이언트만 유지해 Too many clients 오류를 예방한다.
@@ -52,7 +49,10 @@ if (process.env.NODE_ENV !== 'production') {
 
 // drizzle 인스턴스. relational query 를 쓰려면 schema 배럴을 넘겨야 한다.
 // (Phase 2 - D3 에서 `db.query.tasks.findMany({ with: { labels: true } })` 형태로 사용)
-export const db = drizzle(client, { schema, logger: process.env.NODE_ENV === 'development' })
+export const db = drizzle(client, {
+  schema,
+  logger: process.env.NODE_ENV === 'development',
+})
 
 // 재연결 여부 판단이 필요한 통합 테스트 등에서 쓸 수 있도록 raw 핸들도 export.
 // 애플리케이션 코드는 항상 `db` 만 import 하도록 한다.
