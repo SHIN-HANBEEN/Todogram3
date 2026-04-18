@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cx, sortCx } from '@/utils/cx'
+import { TZ_COOKIE_MAX_AGE_SECONDS, TZ_COOKIE_NAME } from '@/lib/timezone'
 
 /* --------------------------------------------------------------------------
  * LoginForm — Todogram v3 (Quiet Layer) 로그인 화면
@@ -257,6 +258,28 @@ export function LoginForm({ onSubmit, redirectTo = '/today' }: LoginFormProps) {
      현재는 안내용 placeholder 로 유지한다. */
   const handleOAuth = async (provider: 'google' | 'apple') => {
     if (provider === 'google') {
+      /* Phase 1 - A4: 브라우저의 IANA TZ 식별자를 쿠키에 심어 Google OAuth 왕복 후
+         NextAuth JWT 콜백이 동일 출처 쿠키로 자동 수신하도록 한다.
+         - Intl.DateTimeFormat().resolvedOptions().timeZone = "Asia/Seoul" 등을 반환.
+         - 쿠키 TTL 은 TZ_COOKIE_MAX_AGE_SECONDS (5분) — OAuth 리다이렉트 왕복을 충분히 커버.
+         - SameSite=Lax — Google 이 우리 콜백으로 돌아올 때(top-level GET navigation)
+           쿠키가 붙어야 하므로 Strict 가 아닌 Lax. Secure 는 prod(https) 에서만 붙이고
+           로컬 http 개발에서는 생략한다(아니면 브라우저가 설정 자체를 무시).
+         - 서버 측에서 DB 저장 전 isValidTimeZone() 으로 재검증하므로 클라이언트 변조는 무해. */
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+        if (tz) {
+          const secureFlag =
+            window.location.protocol === 'https:' ? '; Secure' : ''
+          document.cookie =
+            `${TZ_COOKIE_NAME}=${encodeURIComponent(tz)}` +
+            `; path=/; max-age=${TZ_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax${secureFlag}`
+        }
+      } catch {
+        // 레어 케이스: Intl API 가 timezone 을 반환하지 못하면 쿠키를 세팅하지 않고 진행.
+        // 서버는 쿠키 없음을 감지해 DB default 'Asia/Seoul' 에 맡긴다.
+      }
+
       /* next-auth v5: signIn 은 자체적으로 Google OAuth URL 로 리다이렉트한다.
          성공 시 callbackUrl 로 이동, 실패 시 /login 으로 되돌아 온다(pages.error).
          리다이렉트가 일어나면 이 함수의 이후 라인은 실행되지 않는다. */
