@@ -71,14 +71,27 @@
   - 기존 email validate 로직 · shadcn Input/Checkbox/Label 임시 유지 (NextAuth 연결 후 단계적 교체)
   - 스펙: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/login-variants-20260418/approved.json`
   - **남은 작업 (A1 에서 연결)**: OAuth 버튼 onClick 을 현재 placeholder console.log 에서 `signIn('google' | 'apple', { callbackUrl })` 로 교체
-- [ ] **A1. NextAuth v5 + Google Provider (readonly scope)**
-  - 파일: `src/lib/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`
-  - Scope: `openid email profile https://www.googleapis.com/auth/calendar.events.readonly`
-  - Refresh token 받도록 `access_type: 'offline'`, `prompt: 'consent'`
-- [ ] **A2. Refresh token AES-256-GCM 암호화 저장**
-  - 파일: `src/lib/crypto.ts` (encrypt/decrypt 헬퍼)
-  - NextAuth JWT/Session 콜백에서 refresh token을 DB `users.google_refresh_token`에 암호화 저장
-  - 테스트: encrypt → decrypt round-trip
+- [x] **A1. NextAuth v5 + Google Provider (readonly scope)**
+  - 파일: `src/lib/auth.ts` (신규), `src/app/api/auth/[...nextauth]/route.ts` (신규), `src/components/login-form.tsx` (수정 — Google 버튼 `signIn('google')` 연결)
+  - 패키지: `next-auth@5.0.0-beta.31` 설치 (Next 15 / React 19 호환).
+  - Provider: `next-auth/providers/google` — `authorization.params` 에 `access_type: 'offline'` + `prompt: 'consent'` + `response_type: 'code'` + `scope: 'openid email profile https://www.googleapis.com/auth/calendar.events.readonly'` 강제. refresh_token 발급 보장.
+  - 세션 전략: JWT (Drizzle Adapter 미도입 — 설계 §8-2 기반 수동 upsert 예정, A4 에서 signIn 콜백에 통합). `trustHost: true` 로 프리뷰/서버리스 호스트 검증 통과, `secret` 은 F4 검증 env 에서 주입.
+  - JWT 콜백: 최초 로그인 직후 `account.access_token` / `expires_at` / `refresh_token` 을 JWT 에 복사. A2(DB 암호화 저장) · G1(만료 시 refresh) · G4(revoked 전이) 훅 포인트를 TODO 주석으로 명시.
+  - Session 콜백: access/refresh token 은 세션에 절대 노출하지 않고, Phase 3 G4 용 `session.error = 'RefreshTokenError'` 플래그만 전달.
+  - 타입 augmentation: `declare module 'next-auth'` + `'next-auth/jwt'` 로 `JWT.access_token/expires_at/refresh_token/error` + `Session.error` 필드 확장 (side-effect `import 'next-auth/jwt'` 필수 — 없으면 TS2664).
+  - 에러 페이지: `pages.signIn = '/login'`, `pages.error = '/login'` — Quiet Lamp 화면이 에러 쿼리도 함께 처리.
+  - 라우트 핸들러: `app/api/auth/[...nextauth]/route.ts` 는 `@/lib/auth` 의 `handlers` 에서 `{ GET, POST }` 재-export 만 담당. 설정은 전부 `src/lib/auth.ts` 단일 지점.
+  - LoginForm: `signIn` 을 `next-auth/react` 에서 import, Google 버튼 클릭 시 `signIn('google', { callbackUrl: redirectTo })` 호출 (기본 redirect=true 로 Google OAuth URL 로 즉시 이동). Apple 버튼은 Provider 미등록이라 콘솔 경고 유지 — Apple Developer 인증서 세팅 시 별도 태스크로 활성화.
+  - 검증: `npm run typecheck` · `npm run test` (11 green) · 변경 파일 ESLint · Prettier 전부 통과.
+  - **남은 작업 (A2 / A3 / A4)**: JWT 콜백에 담긴 `refresh_token` 을 AES-256-GCM 암호화 후 `users.google_refresh_token` 에 저장 (A2), `/calendar` `/list` `/settings/*` 보호 미들웨어 (A3), 로그인 시 클라이언트 TZ 수집해 `users.timezone` upsert (A4).
+- [x] **A2. Refresh token AES-256-GCM 암호화 저장**
+  - 파일: `src/lib/crypto.ts` (신규 — `encrypt(plaintext)` / `decrypt(ciphertext)`), `src/lib/auth.ts` (수정 — JWT 콜백에서 upsert), `test/unit/crypto.test.ts` (신규 — 9 케이스)
+  - 알고리즘: **AES-256-GCM** (Node `crypto`, 대칭키). IV=12바이트 randomBytes, auth tag=16바이트. 저장 포맷 = `base64(IV || AUTH_TAG || CIPHERTEXT)` 단일 문자열 → Postgres `text` 한 컬럼으로 끝.
+  - 키 소스: `env.ENCRYPTION_KEY` 를 **call-time 에 lazy read** (F4 에서 이미 base64 디코드 시 32바이트 검증됨). 모듈 로드 시점이 아니라 함수 호출 시점에 읽어서 테스트의 `beforeAll(process.env 주입)` 패턴을 지원.
+  - NextAuth 통합: `jwt` 콜백이 `account` 객체가 존재하는 **최초 로그인 순간** (Google 이 refresh_token 을 내려주는 유일한 순간)에 `encrypt(account.refresh_token)` 후 `users` 테이블에 upsert. `target: users.email` + `ON CONFLICT DO UPDATE` 로 재로그인 시 최신 토큰으로 교체하고 `google_auth_status` 는 항상 `'active'` 로 reset (G4 의 revoked 상태에서 재동의한 유저도 복구). `username` 은 `profile.name → token.name → email` 순 fallback (NOT NULL 제약).
+  - A4 와의 경계: timezone 은 `NOT NULL DEFAULT 'Asia/Seoul'` 로 DB 가 자동 채우므로 여기서는 건드리지 않고, A4 가 클라이언트 TZ 수집 후 별도 업데이트로 덮어쓴다.
+  - 테스트 커버리지: (1) round-trip 일치, (2) ciphertext 가 평문을 포함하지 않음, (3) 랜덤 IV — 같은 평문도 매번 다른 ciphertext, (4) 빈 문자열, (5) Unicode(한글/이모지) 손실 없음, (6) **GCM auth tag 무결성** — ciphertext 중간 바이트 XOR 시 throw, (7) 너무 짧은 입력 방어, (8) 16바이트 키 주입 시 throw, (9) 키 누락 시 throw. `npm run test` 20 green / typecheck / 변경 파일 ESLint / Prettier 전부 통과.
+  - **남은 작업 (Phase 3 G1/G4)**: 저장된 암호화 refresh_token 을 `decrypt` 해 Google access_token 재발급에 사용 (G1), invalid_grant 응답 시 `google_auth_status = 'revoked'` 전이 (G4).
 - [ ] **A3. 세션 미들웨어 + 보호 라우트**
   - 파일: `src/middleware.ts`
   - `/calendar`, `/list`, `/settings/*` 세션 없으면 `/login`으로 리다이렉트
