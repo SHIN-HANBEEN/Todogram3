@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronDown } from '@untitledui/icons'
 import { Lightbulb03 } from '@untitledui/icons'
 import { EyeIcon, EyeOffIcon } from 'lucide-react'
+import { signIn } from 'next-auth/react'
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -130,7 +131,8 @@ const styles = sortCx({
       'h-12 rounded-[10px] border-border-primary bg-bg-primary px-3.5 text-[15px]' +
       ' text-text-primary placeholder:text-text-placeholder' +
       ' focus-visible:border-brand-600 focus-visible:ring-brand-100 dark:focus-visible:border-brand-400',
-    inputError: 'border-border-error focus-visible:border-border-error focus-visible:ring-red-100',
+    inputError:
+      'border-border-error focus-visible:border-border-error focus-visible:ring-red-100',
     /* 비밀번호 input 우측 eye toggle. */
     eyeWrap: 'relative',
     eye:
@@ -250,16 +252,23 @@ export function LoginForm({ onSubmit, redirectTo = '/today' }: LoginFormProps) {
     }
   }
 
-  /* OAuth 클릭 — Phase 1 A1 NextAuth v5 연결 전 임시 placeholder.
-     연결 후: `signIn('google', { callbackUrl: redirectTo })` 로 교체. */
+  /* OAuth 클릭 — Phase 1 A1 에서 Google 만 NextAuth v5 에 연결.
+     Apple 은 후속 태스크(별도 Provider + Apple Developer 인증서 세팅)에서 연결 예정이라
+     현재는 안내용 placeholder 로 유지한다. */
   const handleOAuth = async (provider: 'google' | 'apple') => {
-    try {
-      setOauthLoading(provider)
-      console.log('[login] oauth start:', provider, '→', redirectTo)
-      /* TODO(A1): await signIn(provider, { callbackUrl: redirectTo }) */
-    } finally {
-      setOauthLoading(null)
+    if (provider === 'google') {
+      /* next-auth v5: signIn 은 자체적으로 Google OAuth URL 로 리다이렉트한다.
+         성공 시 callbackUrl 로 이동, 실패 시 /login 으로 되돌아 온다(pages.error).
+         리다이렉트가 일어나면 이 함수의 이후 라인은 실행되지 않는다. */
+      setOauthLoading('google')
+      await signIn('google', { callbackUrl: redirectTo })
+      return
     }
+
+    /* Apple — Provider 미연결 상태. 클릭 시 로딩 스핀만 잠깐 보이게 하지 않고 즉시 안내. */
+    console.warn(
+      '[login] Apple 로그인은 아직 준비 중입니다. Google 또는 이메일을 이용해 주세요.'
+    )
   }
 
   const greeting = getGreeting()
@@ -342,7 +351,9 @@ export function LoginForm({ onSubmit, redirectTo = '/today' }: LoginFormProps) {
                 value={formData.email}
                 onChange={e => handleInputChange('email', e.target.value)}
                 aria-invalid={Boolean(errors.email)}
-                aria-describedby={errors.email ? 'login-email-error' : undefined}
+                aria-describedby={
+                  errors.email ? 'login-email-error' : undefined
+                }
                 tabIndex={showEmailForm ? 0 : -1}
                 className={cx(
                   styles.email.input,
@@ -384,7 +395,9 @@ export function LoginForm({ onSubmit, redirectTo = '/today' }: LoginFormProps) {
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
                   aria-pressed={showPassword}
-                  aria-label={showPassword ? '비밀번호 숨기기' : '비밀번호 보기'}
+                  aria-label={
+                    showPassword ? '비밀번호 숨기기' : '비밀번호 보기'
+                  }
                   tabIndex={showEmailForm ? 0 : -1}
                   className={styles.email.eye}
                 >
