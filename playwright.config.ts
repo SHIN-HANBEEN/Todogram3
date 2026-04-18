@@ -53,5 +53,17 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     stdout: 'ignore',
     stderr: 'pipe',
+    // 테스트 인프라가 .env.local 의 Phase 1+ 시크릿 채움 상태와 독립적으로 동작하도록
+    // env 검증을 스킵하고, NextAuth 가 필요로 하는 최소 시크릿만 테스트 전용 값으로 주입한다.
+    //  * `SKIP_ENV_VALIDATION=1` — vitest.config.ts 와 동일한 F4 스킵 플래그.
+    //    이 모드에서는 `@/env` 의 `env` 객체가 process.env 를 그대로 노출한다.
+    //  * `NEXTAUTH_SECRET` — authConfig 가 모듈 평가 시 읽으므로 값이 필요. E2E 는 비로그인
+    //    리다이렉트 계약만 본다(JWT 복호화 경로는 밟지 않음) 이지만, 미들웨어가 NextAuth 를
+    //    초기화하는 시점에 secret 이 비어있지 않아야 한다. 프로덕션 시크릿과 절대 무관한
+    //    테스트 전용 더미.
+    env: {
+      SKIP_ENV_VALIDATION: '1',
+      NEXTAUTH_SECRET: 'playwright-e2e-only-dummy-secret-00000000000000000000',
+    },
   },
 })
