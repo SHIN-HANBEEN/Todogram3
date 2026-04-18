@@ -194,10 +194,18 @@
   - **TDD 준수**: test 먼저 작성 → `Failed to resolve import "@/lib/google-cal/cache"` RED 확인 → 구현으로 GREEN 전환 → ESLint 0 에러 · Prettier pass. Red-Green-Refactor 사이클 명시적 수행.
   - **남은 작업 (G4 / U1)**: G4 에서 `revoked` 전이 시 `cache.clear()` 를 호출해 stale 이벤트가 UI 에 남지 않도록 연결. U1 Calendar View 가 이 유틸을 실제로 소비 — 월 변경 → debounced(load) → 캐시 확인 → 미스 시 `listCalendarEvents` → `cache.set` 순서로 조립.
   - 검증: `npm run typecheck` ✅ · `npm run test` 215 green (192 기존 + 23 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --check` 통과 ✅
-- [ ] **G4. 401 revoked → user status 전이**
-  - 파일: `src/lib/google-cal/client.ts` 확장
-  - 토큰 취소 감지 시 `users.google_auth_status = 'revoked'` 업데이트
-  - 테스트: mock 401 invalid_grant → DB 상태 전이 확인
+- [x] **G4. 401 revoked → user status 전이**
+  - 파일: `src/lib/google-cal/client.ts` 의 `getGoogleCalClientForUser.onRevoked` 훅 확장, `test/unit/google-cal/client-user.test.ts` (신규 — 8 케이스)
+  - **G1 이 남긴 훅 포인트 채우기**: G1 은 `onRevoked` 콜백 시그니처와 "invalid_grant 경로에서 정확히 한 번 호출 + 훅 자체 throw 는 swallow" 규약까지 제공했고, G4 는 그 훅 본문에 (a) `inMemoryAccessTokenCache.delete(userId)` (b) `db.update(users).set({ googleAuthStatus: 'revoked' }).where(eq(users.id, userId))` 를 붙이는 것으로 끝났다. 이미 합의된 계약을 건드리지 않고 구현체만 추가한 최소 변경.
+  - **순서 결정 (캐시 → DB)**: 캐시 `delete` 를 먼저 실행해 같은 프로세스의 후속 요청이 stale access_token 으로 401→refresh 재시도 루프를 도는 것을 즉시 차단. DB 는 그 뒤 — 설령 DB 쓰기가 네트워크 문제로 지연·실패해도, 최소한 메모리 상태는 일관성을 회복해 둔다. `delete` 는 throw 불가능한 O(1) 연산이라 순서 역전으로 인한 리스크 없음.
+  - **DB 실패 swallow 경계 재확인**: 원래 G1 의 `performRefresh` 가 `try { await store.onRevoked() } catch {}` 로 훅 예외를 묵음 처리하도록 이미 설계되어 있어, DB 연결이 끊겨 update 가 throw 해도 `GoogleAuthRevokedError` 는 호출자(UI)에 그대로 도달한다. "DB 에러 메시지가 사용자에게 보이면 안 된다 — 재로그인 안내가 먼저" 원칙이 전체 레이어에 걸쳐 성립. 테스트 ④ 가 바로 이 경계를 regression-lock.
+  - **G3 event cache clear 는 의도적으로 여기서 하지 않음**: `createEventCache` 는 per-consumer 인스턴스라 이 모듈에서 참조 경로가 없다. 강제로 module-level singleton 으로 묶으면 (1) 멀티유저 격리 깨짐 (2) G3 의 서버리스-친화적 설계 파괴 (3) U1 이 아직 없는 상태에서 "유령 호출처" 생김 — 전부 해롭다. U1 이 `GoogleAuthRevokedError` 를 catch 하는 지점에서 자신의 캐시 인스턴스를 `cache.clear()` 하도록 조립한다. 이 의사결정을 `onRevoked` 본문 주석에 핀 박아 미래의 실수 방지.
+  - **테스트 분리 이유 (별도 파일)**: 기존 `client.test.ts` 는 `createGoogleCalClient` (pure factory, DI only) 만 다루고 DB 를 전혀 건드리지 않는다. G4 는 `getGoogleCalClientForUser` (DB-wired) 를 검증해야 해서 `vi.mock('@/db', ...)` + `vi.mock('@/lib/crypto', ...)` 가 필수 — 두 파일에 섞으면 pure factory 테스트까지 stub 모듈 영향권에 끌어들인다. 새 파일 `client-user.test.ts` 로 격리.
+  - **가짜 drizzle 체인 설계**: `vi.hoisted` 로 select/update 체인을 thenable-free 단순 객체로 만들어 drizzle 쿼리 빌더를 흉내낸다. `.select().from().where().limit()` 의 terminal(`limit`) 과 `.update().set().where()` 의 terminal(`where`) 만 `async` 로 처리하고 중간 단계는 동기 메서드 — 실제 drizzle 과 정확히 동일한 대기 포인트를 재현해 "await 가 어디서 실제로 일어나는가" 를 흔들지 않는다.
+  - **테스트 커버리지 (8/8 green)**: 사전 조건 가드 3 케이스 — (1) userId 존재하지 않으면 "사용자를 찾을 수 없습니다" throw + update 호출 0회, (2) 이미 `googleAuthStatus='revoked'` 면 refresh 시도 없이 즉시 `GoogleAuthRevokedError` + update 호출 0회 (이미 revoked 에게 또 revoked 를 쓰는 불필요 I/O 차단), (3) `googleRefreshToken=null` 이면 `GoogleAuthRevokedError`. G4 전이 5 케이스 — (4) invalid_grant 응답 시 `update().set({ googleAuthStatus:'revoked' }).where(...)` 정확히 1회 호출 + set values 객체 검증, (5) 전이 후에도 호출자에게는 `GoogleAuthRevokedError` 인스턴스가 그대로 rejects, (6) DB update 가 throw 해도 `GoogleAuthRevokedError` 는 전파 (훅 실패 swallow 규약 re-lock), (7) 전이 후 in-memory access token 캐시가 해당 userId 기준으로 비워짐 — 다음 요청이 새 token endpoint 호출을 반드시 트리거해야 함을 행동 기반으로 검증 (내부 Map 직접 access 대신 "probe fetch 에서 token 엔드포인트 호출이 발생했는가" 로 확인), (8) 정상 refresh 성공 경로는 update 호출 0회 (revoked 는 invalid_grant 에서만 일어남을 regression-lock).
+  - **TDD 준수**: 테스트 먼저 작성 → `expected 0 to be 1` RED 확인(DB update 호출 0회 = 아직 G4 구현 전) → `onRevoked` 본문에 `db.update(users).set({ googleAuthStatus:'revoked' }).where(eq(users.id,userId))` 추가로 GREEN 전환. Red-Green-Refactor 사이클 명시적으로 수행.
+  - **Critical Test Gap #2 해소**: "Google 토큰 revoked 401 → status 전이" 테스트 공백이 이 작업으로 닫혔다(§Critical Test Gaps 표 참조).
+  - 검증: `npm run typecheck` ✅ · `npm run test` 223 green (215 기존 + 8 신규) ✅ · `npx eslint src/lib/google-cal/client.ts test/unit/google-cal/client-user.test.ts` 0 에러 ✅ · `npx prettier --check` 통과 ✅
 
 **완료 기준**: 로그인한 사용자의 현재 월 Google Cal 이벤트를 서버에서 가져와서 console.log로 출력 가능. 권한 해제 시뮬레이트 → DB 상태 전이.
 
@@ -359,7 +367,7 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
 | # | 갭 | Phase | 상태 |
 |---|---|---|---|
 | 1 | 다른 user의 task 수정 차단 (403) | D2 | - [ ] |
-| 2 | Google 토큰 revoked 401 → status 전이 | G4 | - [ ] |
+| 2 | Google 토큰 revoked 401 → status 전이 | G4 | - [x] |
 | 3 | Rollover cron user-level try/catch + lock | R2/R3 | - [ ] |
 | 4 | Rollover 중복 실행 방지 (rollover_logs PK) | R3 | - [ ] |
 | 5 | Write toggle primary calendar 가드 (v1.5) | Lane I | ⏸️ v1.5 |
