@@ -38,11 +38,13 @@
   - `drizzle.config.ts` 에서 `@next/env.loadEnvConfig()` 로 `.env.local` 자동 로드 (런타임/CLI env 통일)
   - `.env.example` + `.env.local` 스캐폴드 (Phase 0~5 env 전부 문서화)
   - `npm run db:migrate` 실행 → `__drizzle_migrations` + `users` + `labels` + `tasks` + `task_labels` + `rollover_logs` 6 테이블 생성 확인
-- [ ] **F3. 테스트 프레임워크 세팅 (Vitest + Playwright)**
-  - `vitest.config.ts` + `test/unit/`, `test/integration/`
-  - `playwright.config.ts` + `test/e2e/`
-  - `npm run test`, `npm run test:e2e` 스크립트 추가
-  - 샘플 테스트 1개씩 (smoke check)
+- [x] **F3. 테스트 프레임워크 세팅 (Vitest + Playwright)**
+  - `vitest.config.ts` + `test/unit/`, `test/integration/` (jsdom + jest-dom matcher + `vite-tsconfig-paths` 로 `@/*` alias 인식)
+  - `playwright.config.ts` + `test/e2e/` (chromium 1 프로젝트, `webServer` 자동 기동, `reuseExistingServer` 로컬 최적화)
+  - `npm run test` / `test:watch` / `test:e2e` / `test:e2e:ui` 스크립트 추가
+  - 샘플 smoke 테스트: `test/unit/smoke.test.ts` (산술 + jsdom), `test/integration/smoke.test.ts` (Drizzle 스키마 배럴 import), `test/e2e/smoke.spec.ts` (홈페이지 200 OK)
+  - tsconfig: `types: ['vitest/globals', '@testing-library/jest-dom']` + `test/**` include
+  - `.gitignore` 에 `test-results/`, `playwright-report/`, `playwright/.cache/` 추가
 - [ ] **F4. 환경변수 Zod 검증**
   - `src/env.ts`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `ENCRYPTION_KEY`, `CRON_SECRET`
   - 서버 시작 시 누락되면 throw (런타임 오류 방지)
@@ -56,6 +58,14 @@
 
 ## 🔐 Phase 1: Auth (Day 2)
 
+- [x] **A0. 로그인 화면 Quiet Lamp 재작성** 🎨 `/design-shotgun` Variant A 승인 (2026-04-18)
+  - 파일: `src/components/login-form.tsx` (재작성 완료), `src/app/login/page.tsx` (래퍼 단순화)
+  - 카드 chrome 제거, 중앙 정렬 max-w-[360px], 상단 sage 램프 아이콘 + Instrument Serif 44px `Todogram` 워드마크 + italic 18px 인사말
+  - OAuth 우선 흐름: Google(brand-solid sage) · Apple(black-solid), 각 min-h 52px
+  - 이메일은 `ㆍ이메일로 계속 ▾` disclosure 로 접힘 — 펼치면 email / password(eye toggle) / remember / 로그인 / 비번찾기
+  - 기존 email validate 로직 · shadcn Input/Checkbox/Label 임시 유지 (NextAuth 연결 후 단계적 교체)
+  - 스펙: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/login-variants-20260418/approved.json`
+  - **남은 작업 (A1 에서 연결)**: OAuth 버튼 onClick 을 현재 placeholder console.log 에서 `signIn('google' | 'apple', { callbackUrl })` 로 교체
 - [ ] **A1. NextAuth v5 + Google Provider (readonly scope)**
   - 파일: `src/lib/auth.ts`, `src/app/api/auth/[...nextauth]/route.ts`
   - Scope: `openid email profile https://www.googleapis.com/auth/calendar.events.readonly`
