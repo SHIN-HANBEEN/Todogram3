@@ -135,10 +135,17 @@
   - **D3 와의 경계**: task_labels junction 연결은 여기서 건드리지 않는다 — D3 가 `src/actions/task-labels.ts` 에서 별도 트랜잭션으로 처리하고, 필요 시 `createTaskInputSchema` / `updateTaskInputSchema` 에 `labelIds` 필드를 추가로 확장한다. 관심사 분리로 D2 구현이 junction 스키마 변경에 묶이지 않도록 한 선택.
   - **남은 작업 (D3 / 완료 기준 보완)**: 실 DB 통합 테스트(다른 user 세션으로 요청 보내 403 확인, N+1 쿼리 로그 점검) 는 D3 가 DB 인프라(트랜잭션 롤백 fixture 등) 를 세팅할 때 같은 베이스 위에서 추가. 현재 D2 는 ownership 가드 코드 경로만 단위 검증(스키마/세션 헬퍼) 으로 닫았다.
   - 검증: `npm run typecheck` ✅ · `npm run test` 156 green (78 기존 + 78 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --check` 통과 ✅
-- [ ] **D3. task_labels junction 작업**
-  - 파일: `src/actions/task-labels.ts`
-  - task 생성/수정 시 라벨 연결 트랜잭션
-  - Drizzle relational query `with: { labels: true }` 강제 (N+1 방지)
+- [x] **D3. task_labels junction 작업**
+  - 파일: `src/actions/task-labels.ts` (신규 — 2 Server Actions), `src/lib/validators/task-labels.ts` (신규 — Zod 스키마 + 상수), `test/unit/validators/task-labels.test.ts` (신규 — 16 케이스)
+  - **Server Actions (`src/actions/task-labels.ts`)**: `setTaskLabels` / `listTasksWithLabels` 2종. 모든 함수는 `requireUserId()` 첫 줄 호출 → 미인증 시 `UnauthenticatedError` throw. mutation 후 `/today`, `/list`, `/calendar` 일괄 `revalidatePath`. D2 의 캐시 무효화 스코프와 완전히 동일 — 라벨 연결 변화도 결국 태스크 카드 시각 갱신 이벤트라서.
+  - **원자 교체 패턴 (`setTaskLabels`)**: "add/remove 부분 API" 는 의도적으로 제공하지 않는다. UI(U3 편집 모달) 가 다중 선택 체크박스를 통째로 교체하는 모델이라, 부분 API 를 주면 동시 요청이 순서 의존적으로 갈라져 race condition 을 만들 여지가 생긴다. 대신 단일 트랜잭션 안에서 `DELETE FROM task_labels WHERE task_id = ?` → `INSERT (task_id, label_id)` bulk 로 통째로 교체. 빈 배열 입력은 "모든 라벨 연결 해제" 의미로 허용(DELETE 만 수행).
+  - **Ownership 가드 2단계 (Critical Test Gap #1 회귀 방지)**: (1) taskId 가 현재 사용자 소유인지 트랜잭션 안에서 `SELECT id FROM tasks WHERE id=? AND user_id=?` 로 검증, (2) 요청 labelIds 가 전부 현재 사용자 소유인지 `SELECT FROM labels WHERE user_id=? AND id IN (...)` 단일 쿼리로 일괄 검증. 하나라도 어긋나면 "찾을 수 없음" 단일 에러로 묶어 enumeration 공격 차단(D1/D2 와 동일 기조). 실패한 id 만 메시지에 포함 — 본인 세션 범위 안의 정보라 노출 안전.
+  - **N+1 차단 (`listTasksWithLabels`)**: Drizzle relational query `db.query.tasks.findMany({ with: { taskLabels: { with: { label: true } } } })` 로 `tasks → task_labels → labels` 를 한 번의 JOIN 세트로 로드. 클라이언트가 task 당 별도 쿼리를 날릴 수 없도록 이 한 진입점만 export. 반환 시 junction 구조를 감추고 `{ ...task, labels: Label[] }` 로 평탄화 → UI 가 `task.labels.map(...)` 로 바로 칩 렌더. listTasks 와 동일한 `listTasksInputSchema` 재사용으로 두 API 사이에 필터 payload 모양이 통일된다.
+  - **Zod 스키마 (`src/lib/validators/task-labels.ts`)**: `setTaskLabelsInputSchema` 단일 — `labelIds` 배열 + `TASK_LABELS_MAX_COUNT=10` 상한 + `labelIdSchema` 재사용으로 각 원소 양의 정수 coerce + **중복 제거 transform** (`Array.from(new Set(ids))`). 중복을 사전 제거하지 않으면 junction 복합 PK 위반(23505) 으로 트랜잭션이 통째로 롤백되는 사고가 발생. `Set` 의 삽입 순서 보존 속성으로 원본 순서도 유지 → UI 칩 렌더 순서를 신뢰 가능.
+  - **반환 순서 정렬**: `setTaskLabels` 는 입력 labelIds 순서대로 `Label[]` 반환 (내부에서 `Map` 으로 재정렬). UI 가 입력한 순서를 그대로 칩 배열로 사용할 수 있도록.
+  - **관심사 분리 (D2 와의 경계 유지)**: `createTaskInputSchema` / `updateTaskInputSchema` 는 D3 에서 확장하지 않았다. task 생성/수정 흐름에서 라벨을 함께 연결하고 싶으면 U3 모달이 `createTask` → `setTaskLabels` 를 순차 호출한다 (두 호출 모두 각자의 트랜잭션 경계 안에서 ownership 가드를 가짐). 미래에 "원샷 API" 가 필요해지면 그 때 `setTaskLabels` 를 내부에서 호출하는 얇은 래퍼를 따로 추가하면 된다.
+  - **테스트 커버리지 (16/16 green)**: `setTaskLabelsInputSchema` 를 검증 — (1) 정상 배열 통과, (2) 빈 배열 허용("모든 연결 해제" 의미), (3) 문자열 id coerce (labelIdSchema 재사용 확인), (4) 중복 제거 + 원본 순서 보존, (5) 문자열/숫자 혼합 coerce 후 중복 제거, (6) 경계값 `TASK_LABELS_MAX_COUNT` 통과, (7) 상한 초과 거부 메시지 매칭, (8) 잘못된 원소(0/음수/소수/문자/빈문자/null) 6개 거부, (9) 배열 아님 거부, (10) 필드 누락 거부, (11) null 거부. 실 DB 통합 테스트(소유권 격리 + N+1 SQL 로그 점검) 는 Phase 2 완료 기준의 통합 인프라 단계에서 같은 베이스 위에서 추가.
+  - 검증: `npm run typecheck` ✅ · `npm run test` 172 green (156 기존 + 16 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --write` 통과 ✅
 
 **완료 기준**: 
 - Vitest에서 CRUD round-trip 통과
