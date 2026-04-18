@@ -1755,8 +1755,11 @@ describe('Codex generation (--host codex)', () => {
   test('Claude output unchanged: all Claude skills have zero Codex paths', () => {
     for (const skill of ALL_SKILLS) {
       const content = fs.readFileSync(path.join(ROOT, skill.dir, 'SKILL.md'), 'utf-8');
-      // pair-agent legitimately documents how Codex agents store credentials
-      if (skill.dir !== 'pair-agent') {
+      // pair-agent legitimately documents how Codex agents store credentials.
+      // codex + autoplan document the Codex CLI auth file (~/.codex/auth.json)
+      // and log path (~/.codex/logs/) — those are user-facing Codex CLI paths,
+      // not the gstack Codex host install path.
+      if (skill.dir !== 'pair-agent' && skill.dir !== 'codex' && skill.dir !== 'autoplan') {
         expect(content).not.toContain('~/.codex/');
       }
       // gstack-upgrade legitimately references .agents/skills for cross-platform detection

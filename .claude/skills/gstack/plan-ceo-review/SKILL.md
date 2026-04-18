@@ -644,7 +644,7 @@ Do NOT make any code changes. Do NOT start implementation. Your only job right n
 * I want code that's "engineered enough" — not under-engineered (fragile, hacky) and not over-engineered (premature abstraction, unnecessary complexity).
 * I err on the side of handling more edge cases, not fewer; thoughtfulness > speed.
 * Bias toward explicit over clever.
-* Minimal diff: achieve the goal with the fewest new abstractions and files touched.
+* Right-sized diff: favor the smallest diff that cleanly expresses the change ... but don't compress a necessary rewrite into a minimal patch. If the existing foundation is broken, invoke permission #9 and say "scrap it and do this instead."
 * Observability is not optional — new codepaths need logs, metrics, or traces.
 * Security is not optional — new codepaths need threat modeling.
 * Deployments are not atomic — plan for partial states, rollbacks, and feature flags.
@@ -935,6 +935,7 @@ Rules:
 - At least 2 approaches required. 3 preferred for non-trivial plans.
 - One approach must be the "minimal viable" (fewest files, smallest diff).
 - One approach must be the "ideal architecture" (best long-term trajectory).
+- **These two approaches have equal weight.** Don't default to "minimal viable" just because it's smaller. Recommend whichever best serves the user's goal. If the right answer is a rewrite, say so.
 - If only one approach exists, explain concretely why alternatives were eliminated.
 - Do NOT proceed to mode selection (0F) without user approval of the chosen approach.
 
@@ -1419,7 +1420,7 @@ THE PLAN:
 ```bash
 TMPERR_PV=$(mktemp /tmp/codex-planreview-XXXXXXXX)
 _REPO_ROOT=$(git rev-parse --show-toplevel) || { echo "ERROR: not in a git repo" >&2; exit 1; }
-codex exec "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="high"' --enable web_search_cached 2>"$TMPERR_PV"
+codex exec "<prompt>" -C "$_REPO_ROOT" -s read-only -c 'model_reasoning_effort="high"' --enable web_search_cached < /dev/null 2>"$TMPERR_PV"
 ```
 
 Use a 5-minute timeout (`timeout: 300000`). After the command completes, read stderr:
