@@ -45,12 +45,17 @@
   - 샘플 smoke 테스트: `test/unit/smoke.test.ts` (산술 + jsdom), `test/integration/smoke.test.ts` (Drizzle 스키마 배럴 import), `test/e2e/smoke.spec.ts` (홈페이지 200 OK)
   - tsconfig: `types: ['vitest/globals', '@testing-library/jest-dom']` + `test/**` include
   - `.gitignore` 에 `test-results/`, `playwright-report/`, `playwright/.cache/` 추가
-- [ ] **F4. 환경변수 Zod 검증**
-  - `src/env.ts`: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `ENCRYPTION_KEY`, `CRON_SECRET`
-  - 서버 시작 시 누락되면 throw (런타임 오류 방지)
-- [ ] **F5. 스타터 잔재 제거**
-  - `src/app/smart-farm/` 디렉터리 삭제
-  - `src/app/page.tsx` 랜딩을 Todogram 로그인 안내로 교체
+- [x] **F4. 환경변수 Zod 검증**
+  - `src/env.ts`: F4 스펙 전체 키를 Zod 스키마로 일괄 검증 — `DATABASE_URL`(postgres 스킴), `NEXTAUTH_SECRET`(32자↑), `NEXTAUTH_URL`(절대 URL), `GOOGLE_CLIENT_ID/SECRET`, `ENCRYPTION_KEY`(base64 디코드 시 정확히 32바이트 = AES-256-GCM), `CRON_SECRET`(32자↑), `NODE_ENV`
+  - 모듈 최초 import 시 `parseEnv()` 로 검증, 실패 시 모든 위반 키를 한 번의 `throw Error` 메시지에 나열 → 서버 기동을 중단시켜 잘못된 설정의 조용한 시작을 차단
+  - `SKIP_ENV_VALIDATION=1` / `NEXT_PHASE=phase-production-build` 플래그로 빌드/테스트 스킵 (t3-env 관행)
+  - `src/db/index.ts` 의 수동 `DATABASE_URL` 가드를 `import { env } from '@/env'` 로 교체, 스타터 잔재 `src/lib/env.ts` 삭제
+  - `vitest.config.ts` 에 `env: { SKIP_ENV_VALIDATION: '1' }` 추가 → 테스트에서 `parseEnv(mockedSource)` 를 직접 호출해 검증 로직만 고립 테스트
+  - 테스트: `test/unit/env.test.ts` — 정상 parse, 각 키별 실패 케이스(빈 값 / 잘못된 스킴 / 짧은 시크릿 / 16바이트 ENCRYPTION_KEY / 유효치 않은 URL), 다중 키 동시 에러 메시지 집계까지 8 케이스 전부 green
+- [x] **F5. 스타터 잔재 제거**
+  - `src/app/smart-farm/` 디렉터리 삭제 (+ 전용 소비처였던 `src/components/sections/smart-farm/` 7개 컴포넌트 동반 삭제)
+  - `src/app/page.tsx` 를 `redirect('/login')` RSC 로 교체 — Quiet Lamp 로그인 화면이 v1 의 '로그인 안내' 역할을 겸함. 인증 분기(로그인 시 `/today`)는 A1 연결 후 `auth()` 세션 체크로 확장.
+  - **남은 orphan (F5 범위 외, 별도 정리 필요)**: `src/components/sections/{hero,features,cta}.tsx`, `src/components/layout/{header,footer,container}.tsx`, `src/components/navigation/{main-nav,mobile-nav}.tsx` — 이제 랜딩에서만 쓰이던 스타터 컴포넌트들. `.claude/rules/figma-design-system.md` 표에도 문서화되어 있어 **문서와 함께 일괄 제거**하는 후속 클린업 필요.
 
 **완료 기준**: `npm run typecheck && npm run test && npm run test:e2e` 전부 통과. Supabase에 빈 테이블 5개 존재.
 
