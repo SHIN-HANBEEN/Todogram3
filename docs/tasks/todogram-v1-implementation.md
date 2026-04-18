@@ -92,12 +92,22 @@
   - A4 와의 경계: timezone 은 `NOT NULL DEFAULT 'Asia/Seoul'` 로 DB 가 자동 채우므로 여기서는 건드리지 않고, A4 가 클라이언트 TZ 수집 후 별도 업데이트로 덮어쓴다.
   - 테스트 커버리지: (1) round-trip 일치, (2) ciphertext 가 평문을 포함하지 않음, (3) 랜덤 IV — 같은 평문도 매번 다른 ciphertext, (4) 빈 문자열, (5) Unicode(한글/이모지) 손실 없음, (6) **GCM auth tag 무결성** — ciphertext 중간 바이트 XOR 시 throw, (7) 너무 짧은 입력 방어, (8) 16바이트 키 주입 시 throw, (9) 키 누락 시 throw. `npm run test` 20 green / typecheck / 변경 파일 ESLint / Prettier 전부 통과.
   - **남은 작업 (Phase 3 G1/G4)**: 저장된 암호화 refresh_token 을 `decrypt` 해 Google access_token 재발급에 사용 (G1), invalid_grant 응답 시 `google_auth_status = 'revoked'` 전이 (G4).
-- [ ] **A3. 세션 미들웨어 + 보호 라우트**
-  - 파일: `src/middleware.ts`
-  - `/calendar`, `/list`, `/settings/*` 세션 없으면 `/login`으로 리다이렉트
-- [ ] **A4. Timezone 수집 + users.timezone 저장**
-  - 로그인 시 클라이언트에서 `Intl.DateTimeFormat().resolvedOptions().timeZone` 전송
-  - NextAuth signIn 콜백에서 DB에 저장 (최초 1회)
+- [x] **A3. 세션 미들웨어 + 보호 라우트**
+  - 파일: `src/middleware.ts` (신규), `src/lib/auth.config.ts` (신규 — Edge-safe 기본 설정 분리), `src/lib/auth.ts` (수정 — authConfig 를 spread 로 확장), `playwright.config.ts` (수정 — webServer 에 테스트 전용 env 주입), `test/e2e/middleware.spec.ts` (신규 — 5 케이스)
+  - **Split Config 패턴** (authjs.dev/guides/edge-compatibility): `auth.config.ts` 에 providers/secret/trustHost/pages/session 콜백 + JWT 타입 augmentation 을 모으고, DB(`postgres`) + Node crypto 를 건드리는 `jwt` 콜백은 `auth.ts` 가 spread 로 덮어쓴다. middleware 는 절대 `@/lib/auth` 를 import 하지 않음 — 그러면 Edge 번들에 postgres 드라이버가 딸려가 런타임이 깨지기 때문.
+  - Middleware 구현: `NextAuth(authConfig).auth(req)` wrapper 로 `req.auth` 를 노출하고, 세션 없으면 `new URL('/login', nextUrl.origin)` 에 `callbackUrl=<pathname+search>` 를 실어 307 리다이렉트. 307 은 메서드 보존이라 추후 POST 보호 엔드포인트 추가 시에도 안전.
+  - matcher: `['/calendar/:path*', '/list/:path*', '/settings/:path*']` — `:path*` 는 "0 개 이상 세그먼트" 라 `/calendar` 자체도 포함. `/`, `/login`, `/api/auth/*` 는 matcher 에서 제외되어 미들웨어 자체가 호출되지 않음.
+  - **테스트 인프라 분리**: `.env.local` 의 Phase 1+ 시크릿 채움 상태와 독립적으로 e2e 가 동작하도록 `playwright.config.ts` 의 `webServer.env` 에 `SKIP_ENV_VALIDATION=1` + 테스트 전용 `NEXTAUTH_SECRET` 더미 주입 (`vitest.config.ts` 가 이미 적용하는 F4 스킵 플래그를 e2e 로 확장). 프로덕션 시크릿과 무관.
+  - E2E 커버리지 (`test/e2e/middleware.spec.ts`): (1) `/calendar` 비로그인 → `/login?callbackUrl=/calendar`, (2) `/list` 동일, (3) `/settings/labels` 중첩 경로, (4) `/settings` prefix 자체, (5) `/login` 은 matcher 제외로 통과(리다이렉트 루프 방지 회귀). 5/5 green. 전체 e2e 6/6 (smoke 포함) green. `npm run typecheck` · `npm run test` 20 green · 변경 파일 ESLint 0 에러 · Prettier pass 전부 통과.
+  - **남은 작업 (A4)**: 로그인 직후 클라이언트 TZ (`Intl.DateTimeFormat().resolvedOptions().timeZone`) 를 수집해 `users.timezone` 에 최초 1회 upsert.
+- [x] **A4. Timezone 수집 + users.timezone 저장**
+  - 파일: `src/lib/timezone.ts` (신규 — `isValidTimeZone` 검증 + `TZ_COOKIE_NAME` / `TZ_COOKIE_MAX_AGE_SECONDS` 상수), `src/lib/auth.ts` (수정 — JWT 콜백에서 쿠키 읽어 upsert), `src/components/login-form.tsx` (수정 — Google 버튼 클릭 시 쿠키 세팅), `test/unit/timezone.test.ts` (신규 — 8 케이스)
+  - **전달 경로**: 브라우저 쿠키. NextAuth v5 `signIn` 의 `authorizationParams` 는 OAuth provider 쪽 URL 파라미터라 Google 이 콜백에 그대로 돌려준다는 보장이 없고, 별도 POST 엔드포인트는 추가 왕복 + "최초 1회" 판정을 서버에서 다시 해야 해 오버엔지니어링. 쿠키는 동일 출처 OAuth 왕복 후 자동으로 콜백에 실려오므로 최소 움직임으로 달성.
+  - 클라이언트 (`login-form.tsx`): Google 버튼 클릭 직전 `Intl.DateTimeFormat().resolvedOptions().timeZone` 을 `td_tz` 쿠키에 `max-age=300; SameSite=Lax; Secure(https only)` 로 저장. 쿠키 이름/TTL 은 `@/lib/timezone` 상수로 공유해 컴포넌트-서버 계약이 한 곳에서 관리됨.
+  - 서버 (`auth.ts` JWT 콜백): `account` 가 존재하는 최초 로그인 순간 `next/headers` 의 `cookies()` 로 `td_tz` 를 읽고 `isValidTimeZone()` 으로 재검증(헤더 인젝션/스크립트 등 오염 차단). 검증 통과 시에만 upsert 의 `values.timezone` 에 포함. **`set` 블록에는 포함하지 않음** — 재로그인 시 기존 DB 값이 유지되어 "최초 1회" 정책을 DB 레벨에서 자연스럽게 강제. 검증 실패 시 스키마 `DEFAULT 'Asia/Seoul'` 에 맡김.
+  - 검증 로직 (`timezone.ts`): 1차 문자셋 화이트리스트(`[A-Za-z0-9_/+:-]+`, 길이 ≤ 64), 2차 `new Intl.DateTimeFormat({ timeZone })` 의 RangeError 여부. `Intl.supportedValuesOf('timeZone')` 는 canonical 만 반환해 `UTC` / `Etc/UTC` 같은 정식 alias 를 놓치므로 의도적으로 사용하지 않음.
+  - 테스트 커버리지: (1) 표준 대륙/도시 식별자 통과, (2) UTC/Etc 계열 alias 통과, (3) 비문자열/빈/공백/숫자/객체 거절, (4) 가짜 TZ 거절, (5) 쿠키 인젝션·스크립트 등 악성 문자셋 거절, (6) 64자 초과 거절, (7) 쿠키 이름 상수 계약 잠금, (8) TTL 범위(60~600초) 잠금. 전체 `npm run test` 28 green / `npm run typecheck` / `npx playwright test` 6 green / 변경 파일 ESLint 0 에러 / Prettier pass.
+  - **남은 작업**: Settings 화면에서 사용자가 TZ 를 수동 변경하는 UI 는 v1 범위 외(Phase 4 U4 Label 관리 외 범위). v1 dogfooding 에서 자동 감지로 충분한지 검증 후 v1.5 로 판단.
 
 **완료 기준**: Google 로그인 → users 테이블에 본인 레코드 생성 (email, timezone, 암호화된 refresh_token). 로그아웃 → 보호 라우트 접근 차단.
 
