@@ -115,15 +115,26 @@
 
 ## 🗄️ Phase 2: Data Layer (Day 3)
 
-- [ ] **D1. Labels Server Actions + Zod 검증**
-  - 파일: `src/actions/labels.ts`
-  - `createLabel`, `updateLabel`, `deleteLabel`, `listLabels`
-  - 라벨 색상 `#RRGGBB` 형식 검증, `google_color_id` 1~11 범위
-- [ ] **D2. Tasks Server Actions + Zod 검증**
-  - 파일: `src/actions/tasks.ts`
-  - `createTask`, `updateTask`, `toggleTaskStatus`, `deleteTask`, `listTasks`
-  - **⚠️ 보안 테스트 필수**: `WHERE user_id = session.userId` 가드 없으면 남의 task 수정 가능
-  - `position` 정수 + 정렬 로직
+- [x] **D1. Labels Server Actions + Zod 검증**
+  - 파일: `src/actions/labels.ts` (신규 — 4 Server Actions), `src/lib/validators/labels.ts` (신규 — Zod 스키마 + 상수), `src/lib/session.ts` (신규 — `requireUserId()` 헬퍼 + `UnauthenticatedError`), `src/lib/auth.config.ts` (수정 — Session/JWT augmentation 에 `dbUserId` / `userId` 추가), `src/lib/auth.ts` (수정 — JWT 콜백이 upsert 결과 `.returning({ id })` 로 `token.userId` 채움 + stale JWT backfill), `test/unit/validators/labels.test.ts` (신규 — 50 케이스)
+  - **세션 → DB userId 파이프라인**: Phase 1 의 NextAuth 는 OAuth provider id 만 알 뿐 우리 `users.id`(SERIAL) 를 모른다. D1 부터 Server Action 들이 `WHERE user_id = ?` ownership 가드를 걸어야 하므로, JWT 콜백에서 upsert 시 `.returning({ id: users.id })` 로 PK 를 받아 `token.userId` 에 박아둔다. 세션 콜백이 이를 `session.dbUserId` 로 노출 → `requireUserId()` 가 단일 진입점이 된다.
+  - **`dbUserId` 키 명명 이유**: NextAuth v5 의 session callback 시그니처는 JWT/Database 전략 타입 intersection 이라 `AdapterSession.userId: string` 이 끼어든다. Session 에 `userId: number` 를 augment 하면 `userId: never` 로 collapse 해 콜백에서 대입 불가. 키를 `dbUserId` 로 분리해 충돌을 원천 차단(JWT 쪽은 교차가 없어 그대로 `userId`).
+  - **Stale JWT backfill**: 기존에 발급된 토큰(= `account` 없는 후속 요청)에도 `token.userId` 가 비어있을 수 있어, JWT 콜백 마지막에 `token.email` 로 한 번 조회해 채워둔다. 정상 흐름에서는 매 요청 DB 히트가 발생하지 않고, 마이그레이션 직후 1회만 발생.
+  - **Zod 스키마 (`src/lib/validators/labels.ts`)**: `createLabelInputSchema` (name trim → 1~50자 / color `^#[0-9A-Fa-f]{6}$` / googleColorId `'1'~'11' | null`, 누락 시 null 정규화), `updateLabelInputSchema` (모든 필드 optional + refine 로 빈 객체 거부; `googleColorId` 는 transform 안 걸어 `undefined` = "변경 안 함" / `null` = "매핑 해제" 의미를 보존), `labelIdSchema` (`z.coerce.number().int().positive()` — string/number 양쪽 입력 수용). 한국어 메시지로 클라이언트 폼에서 그대로 재사용 가능.
+  - **Server Actions (`src/actions/labels.ts`)**: 모든 함수 첫 줄에서 `requireUserId()` 호출 → 미인증 시 `UnauthenticatedError` throw. 모든 쿼리에 `eq(labels.userId, userId)` 가드 부착 (Critical Test Gap #1 회귀 차단). `createLabel` 은 트랜잭션 안에서 `(현재 사용자 라벨 max position) + 1` 자동 채번해 동시 생성 race 안전. UNIQUE(user_id, name) 위반(Postgres `23505`) 은 한국어 친화 메시지로 변환. `updateLabel` 은 0건 매치 시 (= 없거나 타 사용자 소유) "찾을 수 없음" 단일 에러로 묶어 enumeration 공격 방지. mutation 후 `/settings/labels`, `/list`, `/calendar`, `/today` 일괄 `revalidatePath` (미생성 라우트는 Next.js 가 무시).
+  - **테스트 커버리지 (50/50 green)**: `createLabelInputSchema` 18 케이스 (name trim/경계값/누락 · color 대소문자/단축형/RGBA/CSS함수/공백 거부 · googleColorId 11개 허용값 + 잘못된 7개 거부 + 누락→null/명시null 통과), `updateLabelInputSchema` 5 케이스 (부분 수정 · 빈 객체 refine · 잘못된 값 섞임 거부), `labelIdSchema` 11 케이스 (양의 정수 coerce + 0/음수/소수/문자열 거부). 정규식 자체 잠금 테스트로 향후 회귀 차단.
+  - **남은 작업 (D2/D3 시점)**: 실 DB 통합 테스트(다른 user 세션으로 createLabel/listLabels/updateLabel 권한 격리 검증)는 Phase 2 - D2/D3 가 DB 인프라(트랜잭션 롤백 fixture 등) 를 세팅할 때 같은 베이스를 공유해 추가. 현재는 ownership 가드 코드 경로만 단위 검증(스키마/세션 헬퍼 분리) 으로 닫았다.
+  - 검증: `npm run typecheck` ✅ · `npm run test` 78 green (28 + 50) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --write` 통과 ✅
+- [x] **D2. Tasks Server Actions + Zod 검증**
+  - 파일: `src/actions/tasks.ts` (신규 — 5 Server Actions), `src/lib/validators/tasks.ts` (신규 — Zod 스키마 + 상수 + 상태 전이 규칙), `test/unit/validators/tasks.test.ts` (신규 — 78 케이스)
+  - **Server Actions (`src/actions/tasks.ts`)**: `listTasks` / `createTask` / `updateTask` / `toggleTaskStatus` / `deleteTask` 5종. 모든 함수 첫 줄에서 `requireUserId()` 호출 → 미인증 시 `UnauthenticatedError` throw. 모든 쿼리에 `eq(tasks.userId, userId)` ownership 가드 부착 (Critical Test Gap #1 — A 사용자가 B 의 task id 로 수정 요청 보내도 매치 0건 → "찾을 수 없음" 단일 에러, enumeration 차단). `createTask` 는 D1 과 동일하게 트랜잭션 안에서 `(현재 사용자 task max position) + 1` 자동 채번해 동시 생성 race 안전. mutation 후 `/today`, `/list`, `/calendar` 일괄 `revalidatePath` (Phase 4 까지 미생성이라 Next.js 가 조용히 무시).
+  - **상태 전이 일관성 (`resolveDoneAt` 헬퍼)**: `status === 'done'` 으로 바뀌는 순간 `doneAt = new Date()`, 다른 상태로 바뀔 때 `doneAt = null`. `createTask` · `updateTask` · `toggleTaskStatus` 세 경로가 전부 같은 헬퍼를 경유해 "status=done 인데 doneAt=null" 같은 중간 상태가 절대 DB 에 남지 않도록 보장. status 미변경 update 에서는 `doneAt` 을 SET 절에서 아예 제외해 기존 완료 스탬프를 덮어쓰지 않음.
+  - **Zod 스키마 (`src/lib/validators/tasks.ts`)**: `createTaskInputSchema` (title trim → 1~200자 / notes·location nullable text trim 후 빈 문자열은 null 정규화 / status enum `TASK_STATUSES` 재-export / dueAt 은 Date|ISO문자열|null union + transform 으로 Invalid Date 명시 거부 / rolloverEnabled 누락 시 true — DB DEFAULT 와 정합), `updateTaskInputSchema` (모든 필드 optional + refine 로 빈 객체 거부; nullable 필드는 `undefined` = "변경 안 함" / `null` = "값 제거" 의미를 transform 없이 보존), `toggleTaskStatusInputSchema` (status 한 필드만 — 2-상태 flip 이 아니라 "목표 상태를 명시적으로 전달" 패턴이라 `in_progress` 전이도 자연스럽게 지원), `taskIdSchema` (D1 labelIdSchema 와 동일 coerce 패턴), `listTasksInputSchema` (status / dueFrom / dueTo 선택 필터 — 전체 필터 객체 자체도 optional 이라 인자 없이 호출 가능). 한국어 메시지 톤으로 클라이언트 폼에서 그대로 재사용.
+  - **dueAt 설계 결정**: `z.coerce.date()` 를 쓰지 않은 이유 — `new Date(null)` 이 1970-01-01 로 coerce 되어 "마감 없음" 의도가 통째로 사라짐. 대신 `z.union([date, string, null]).transform(...)` 로 분기해 null 은 null 그대로, 빈 문자열은 null 로 정규화, 잘못된 문자열/Invalid Date 는 `z.NEVER` 로 명시 거부.
+  - **테스트 커버리지 (78/78 green)**: `createTaskInputSchema` 가 대부분 (title trim·경계값·누락, notes/location 빈문자열 정규화·max+1 거부, status 3개 허용값 + 7개 잘못된 값 거부, dueAt Date/ISO/빈문자열/null/Invalid 각 분기, rolloverEnabled 불리언 + 4개 잘못된 타입 거부, 모든 optional 필드 누락 시 DB DEFAULT 와 정합한 기본값). `updateTaskInputSchema` 는 부분 수정 3가지 + nullable 필드 undefined/null 구별 3가지 + 빈 객체 refine + 혼합 실패. `toggleTaskStatusInputSchema` · `taskIdSchema` · `listTasksInputSchema` 는 D1 동등 수준의 경계값 락.
+  - **D3 와의 경계**: task_labels junction 연결은 여기서 건드리지 않는다 — D3 가 `src/actions/task-labels.ts` 에서 별도 트랜잭션으로 처리하고, 필요 시 `createTaskInputSchema` / `updateTaskInputSchema` 에 `labelIds` 필드를 추가로 확장한다. 관심사 분리로 D2 구현이 junction 스키마 변경에 묶이지 않도록 한 선택.
+  - **남은 작업 (D3 / 완료 기준 보완)**: 실 DB 통합 테스트(다른 user 세션으로 요청 보내 403 확인, N+1 쿼리 로그 점검) 는 D3 가 DB 인프라(트랜잭션 롤백 fixture 등) 를 세팅할 때 같은 베이스 위에서 추가. 현재 D2 는 ownership 가드 코드 경로만 단위 검증(스키마/세션 헬퍼) 으로 닫았다.
+  - 검증: `npm run typecheck` ✅ · `npm run test` 156 green (78 기존 + 78 신규) ✅ · `npx eslint` 0 에러 ✅ · `npx prettier --check` 통과 ✅
 - [ ] **D3. task_labels junction 작업**
   - 파일: `src/actions/task-labels.ts`
   - task 생성/수정 시 라벨 연결 트랜잭션
