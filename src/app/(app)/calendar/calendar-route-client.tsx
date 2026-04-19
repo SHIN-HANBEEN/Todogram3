@@ -185,7 +185,10 @@ export function CalendarRouteClient({
   return (
     <div
       data-slot="calendar-route-root"
-      className="flex h-dvh min-h-0 w-full flex-col bg-bg-primary"
+      /* U5: 모바일/태블릿에서는 BottomNav(72px) 가 뷰포트 하단을 덮으므로
+       * 캘린더 drill-down 영역이 BottomNav 에 가리지 않게 높이를 viewport - 72px 로 제한.
+       * lg 이상은 BottomNav 대신 SidebarNav 가 쓰이므로 전체 dvh 그대로 사용. */
+      className="flex h-[calc(100dvh-72px)] min-h-0 w-full flex-col bg-bg-primary lg:h-dvh"
     >
       {showReauthBanner && <ReauthBanner locale={locale} />}
       <div className="flex min-h-0 flex-1">
