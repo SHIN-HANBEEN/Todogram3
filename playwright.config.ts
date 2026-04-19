@@ -1,7 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
+import { E2E_CRON_SECRET } from './test/e2e/global-setup'
+
 // ============================================================================
-// Playwright 설정 (Phase 0 - F3)
+// Playwright 설정 (Phase 0 - F3 / Phase 5 R4 확장)
 // ============================================================================
 // - End-to-end 테스트 전용. UI/Server Action/Cron flow 를 실제 Next.js 서버에 띄워 검증.
 // - `webServer` 가 자동으로 `npm run dev` 를 띄우고 baseURL 로 트래픽을 보낸다.
@@ -9,6 +11,8 @@ import { defineConfig, devices } from '@playwright/test'
 //   * 로컬에서는 이미 떠 있는 dev 서버를 그대로 재사용 → 반복 실행 속도 개선.
 // - v1 단계에서는 본인 dogfooding 위주이므로 Chromium 만 사용. (브라우저 호환성 검증은 v2)
 // - 테스트 파일은 `test/e2e/` 에만 둔다. Vitest 와 절대 겹치지 않게 격리.
+// - Phase 5 R4: `globalSetup` 으로 `.env.local` 을 테스트 프로세스에 주입하고, `webServer.env`
+//   에 동일한 `CRON_SECRET` 을 주입해 cron 엔드포인트 round-trip 을 검증한다.
 // ============================================================================
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000
@@ -17,6 +21,11 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`
 export default defineConfig({
   // E2E 스펙 디렉터리. *.spec.ts / *.test.ts 모두 인식.
   testDir: './test/e2e',
+  // `test/e2e/helpers/**` 와 `test/e2e/global-setup.ts` 는 테스트 러너가 테스트 파일로
+  // 오해하지 않도록 명시적 패턴으로 제한. *.spec.ts / *.test.ts 만 수집된다.
+  testMatch: /.*\.(spec|test)\.ts$/,
+  // 전역 setup: .env.local 로드 + E2E 용 CRON_SECRET 주입 (Phase 5 R4).
+  globalSetup: './test/e2e/global-setup.ts',
   // 테스트 하나 당 최대 30초. 외부 네트워크가 끼면 늘릴 것.
   timeout: 30_000,
   // 모든 단언(`expect`) 은 5초 안에 통과해야 함.
@@ -64,6 +73,9 @@ export default defineConfig({
     env: {
       SKIP_ENV_VALIDATION: '1',
       NEXTAUTH_SECRET: 'playwright-e2e-only-dummy-secret-00000000000000000000',
+      // Phase 5 R4: cron 엔드포인트가 검증할 Bearer 토큰. 테스트 쪽에서도 동일한 값을 사용해
+      // 서버와 클라이언트가 같은 시크릿을 공유한다(`E2E_CRON_SECRET` 은 globalSetup 에서 export).
+      CRON_SECRET: E2E_CRON_SECRET,
     },
   },
 })
