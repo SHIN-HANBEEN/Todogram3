@@ -352,8 +352,15 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - **접근성**: `nav[aria-label="주요 네비게이션"]`, 활성 `aria-current="page"`, 터치 타겟 48×48 (§9-10), focus-visible sage 링, `motion-reduce:transition-none` (§9-9), 아이콘 `aria-hidden`.
   - **Open questions (v1 구현 중 해결)**: Today 탭 미완료 카운트 뱃지(v1.5로 이월), Today 재탭 시 상단 탭 리셋 여부(기본 리셋 안 함), arrow key 순환(v2 고려).
   - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/bottomnav-variants-20260417/approved.json` 에 spec 전문 저장. rejected variants (A Quiet Icons, B Sage Dot Anchor, D Floating Pill) 사유 기록.
-- [ ] **U0.7. Today View 스크린 (Unified Ledger Layout)** 🎨 `/design-shotgun` D refined v3 승인
+- [x] **U0.7. Today View 스크린 (Unified Ledger Layout)** 🎨 `/design-shotgun` D refined v3 승인
   - 파일: `src/components/todogram/today-view.tsx`, `today-row.tsx`, `filter-rail.tsx`, `rollover-banner.tsx`, `labels.ts`
+  - ✅ **구현 완료 (2026-04-19, 커밋 `a7b8fb1`)**: 5개 파일 모두 approved.json spec 대로 구현.
+    - `today-view.tsx` — TodayHeader → FilterRail → RolloverBanner? → stream(+Fab) 조합. 내부 `matchesFilter` 로 activeFilter 기반 필터링, `useMemo` 로 `buildTodayStream` 재계산 최소화. `role="tabpanel"` + `aria-labelledby`로 TodayHeader tablist 와 연결.
+    - `today-row.tsx` — mine/ext 통합 geometry([time 56 · check 18 · title flex · chip auto], min-h 56px, `border-l-[3px]` + `rounded-r-md`). ext 는 `invisible` 체크박스 + `text-secondary` 제목으로만 구분. `borderLeftColorClass` 로 Tailwind v4 `border-l-label-*` 토큰 매핑. `TodayRowDivider` 는 `flex:0 0 1px` + `min-h-px` + `ml-[3px]` 로 flex-shrink collapse 방지. `buildTodayStream` 헬퍼로 divider-row 번갈음 flatMap 패턴 캡슐화.
+    - `filter-rail.tsx` — sticky top-0 z-5 · `overflow-x-auto` + scrollbar 숨김 · `role="tablist"` + 칩별 `role="tab" aria-selected` + `aria-controls=panelId`. `buildDefaultFilterItems` 로 [전체 → 캘린더(reserved dust-blue) → 사용자 라벨] 순 자동 조립. 44px 터치 타겟 + focus-visible 링.
+    - `rollover-banner.tsx` — count ≤ 0 시 null 반환. amber tick + `bg-label-amber-bg` · `role="status" aria-live="polite"` · 유지(outline sage) / 보관(ghost) 2 액션 · 선택적 X 닫기. `motion-safe:animate-in fade-in duration-[400ms]` (DESIGN §7).
+    - `labels.ts` — `CALENDAR_LABEL_ID='calendar'`, `FILTER_ALL='all'`, `LABEL_COLOR_MAP`(calendar→dust-blue, personal→plum 재배정), `DEFAULT_USER_LABEL_PRESET`(직장 sage · 가정 terracotta · 학습 amber · 개인 plum), `USER_LABEL_PALETTE`(dust-blue 제외 5색), `getLabelColor`/`hexToLabelColor` 헬퍼.
+  - **검증**: `npm run typecheck` 통과. todogram/* 파일군 lint 경고 0. 페이지 라우트 연결(`/today`) 은 Phase 4 후속 U1~U3 서버 데이터 연동 시 함께 처리 예정(컴포넌트는 presenter-only).
   - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/today-view-20260417/iteration-3.html` (확정안), `iteration-1.html` · `iteration-2.html` (진행 기록)
   - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/today-view-20260417/approved.json` — 전체 spec + decisions log + open questions
   - **핵심 결정**: 카드 대신 **통합 row ledger**. 내 태스크와 외부 이벤트가 동일한 geometry 를 공유하고, 좌측 3px 색 틱으로 라벨 색을 계승. DESIGN.md §2 "Context-scoped 해석 — Today View row" 참조.
