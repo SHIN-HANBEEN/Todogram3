@@ -30,6 +30,10 @@ import {
 import type { LabelChipColor } from '@/components/todogram/label-chip'
 import type { Task, TaskStatus } from '@/db/schema'
 import { toggleTaskStatus, updateTaskPosition } from '@/actions/tasks'
+import {
+  TaskFormSheet,
+  type TaskFormLabelOption,
+} from '@/components/task-form/task-form-sheet'
 
 import { SearchBox } from './search-box'
 import {
@@ -115,7 +119,11 @@ export interface TaskListViewProps
   initialTasks: TaskListItem[]
   /** 사용자 라벨 목록 — filter rail 과 row 라벨 렌더에 사용. */
   userLabels: TaskListLabel[]
-  /** 새 태스크 추가 FAB 클릭. 지정 시 Fab 렌더. */
+  /**
+   * 새 태스크 추가 FAB 클릭 핸들러 오버라이드.
+   * 지정하지 않으면 내부 TaskFormSheet(create) 이 열린다.
+   * 커스텀 플로우(예: 풀-페이지 폼) 로 바꾸고 싶을 때만 주입.
+   */
   onCreateTask?: () => void
   /** 로케일. 기본 'ko'. */
   locale?: 'ko' | 'en'
@@ -232,6 +240,49 @@ export function TaskListView({
   const [searchQuery, setSearchQuery] = useState('')
   const [collapsed, setCollapsed] = useState<CollapsedState>(DEFAULT_COLLAPSED)
   const [, startTransition] = useTransition()
+
+  /* --- 폼 모달(U3) 상태 ------------------------------------------------
+   * mode: 'create' | 'edit' — initialTask 유무로 구분할 수도 있지만 상태 머신을
+   * 명시적으로 둬서 open 직후 애니메이션 중 null → null 깜빡임을 막는다.
+   * editingTaskId: 편집 중인 task id. items 에서 최신 row 를 찾아 initialTask 로 주입해
+   * 낙관적 업데이트 후 re-open 시 값이 최신으로 맞는다. */
+  const [formOpen, setFormOpen] = useState(false)
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create')
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null)
+
+  /* items 업데이트와 무관하게 open 상태에서 최신 task/labelIds 를 추출 — 스냅샷처럼 쓴다. */
+  const editingEntry = useMemo(() => {
+    if (formMode !== 'edit' || editingTaskId == null) return null
+    return items.find(i => i.task.id === editingTaskId) ?? null
+  }, [formMode, editingTaskId, items])
+
+  /* TaskFormSheet 가 쓰는 라벨 옵션 — 필터 rail 의 FilterableUserLabel 과 같은 구조지만
+   * 'all' 등 특수 필터값이 섞이지 않도록 DB 라벨만 통과시킨다. */
+  const formLabelOptions = useMemo<TaskFormLabelOption[]>(
+    () =>
+      userLabels.map(l => ({
+        id: l.id,
+        name: l.name,
+        color: l.color,
+      })),
+    [userLabels],
+  )
+
+  const openCreateForm = useCallback(() => {
+    if (onCreateTask) {
+      onCreateTask()
+      return
+    }
+    setFormMode('create')
+    setEditingTaskId(null)
+    setFormOpen(true)
+  }, [onCreateTask])
+
+  const openEditForm = useCallback((taskId: number) => {
+    setFormMode('edit')
+    setEditingTaskId(taskId)
+    setFormOpen(true)
+  }, [])
 
   /* 드래그 중 관찰용 — 현재는 active id 저장만. DragOverlay 구현 시 확장. */
   const [, setActiveId] = useState<string | null>(null)
@@ -594,6 +645,7 @@ export function TaskListView({
                       onStatusCycle={next =>
                         handleStatusCycle(task.id, next)
                       }
+                      onEdit={() => openEditForm(task.id)}
                       /* sectionDroppableId 가 status 에서만 파생되므로,
                          droppable section 쪽이 항상 TaskRow 보다 우선 확보되도록
                          data-section-droppable-id 를 부여. 접근성 영향은 없음. */
@@ -607,8 +659,42 @@ export function TaskListView({
         </DndContext>
       </div>
 
-      {/* FAB — 새 태스크 추가. */}
-      {onCreateTask && <Fab onClick={onCreateTask} locale={locale} />}
+      {/* FAB — 새 태스크 추가. 내부 TaskFormSheet 이 기본이며, 호출자가 onCreateTask 를
+          넘긴 경우 그 핸들러를 우선 호출 (openCreateForm 안에서 분기). */}
+      <Fab onClick={openCreateForm} locale={locale} />
+
+      {/* U3 Task 생성/편집 Sheet.
+       * - mode / initialTask 는 열릴 때마다 재계산되어 RHF defaultValues 를 새로 받는다.
+       * - revalidatePath 가 서버 페이지를 다시 렌더 → initialTasks prop 이 갱신되지만,
+       *   빠른 피드백을 위해 onSaved / onDeleted 에서 로컬 items 도 즉시 병합한다. */}
+      <TaskFormSheet
+        mode={formMode}
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        initialTask={editingEntry?.task ?? null}
+        initialLabelIds={editingEntry?.labelIds ?? []}
+        availableLabels={formLabelOptions}
+        onSaved={savedTask => {
+          /* 로컬 items 에 즉시 반영. 서버 revalidatePath 가 도착하면 props 로 덮어써지지만
+           * 그 사이 깜빡임을 줄인다. labelIds 는 폼이 보낸 원본을 재구성하기 어려우므로
+           * 서버 revalidate 가 올 때까지 기존 값을 유지 (편집 모드만 해당).
+           * 생성 모드는 새 row 를 리스트 끝에 추가 — position 은 서버가 돌려준 값. */
+          setItems(prev => {
+            if (formMode === 'create') {
+              return [...prev, { task: savedTask, labelIds: [] }]
+            }
+            return prev.map(entry =>
+              entry.task.id === savedTask.id
+                ? { ...entry, task: savedTask }
+                : entry,
+            )
+          })
+        }}
+        onDeleted={deletedId => {
+          setItems(prev => prev.filter(entry => entry.task.id !== deletedId))
+        }}
+        locale={locale}
+      />
     </div>
   )
 }

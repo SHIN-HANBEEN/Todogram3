@@ -60,6 +60,11 @@ export interface TaskRowProps
    * 낙관적 업데이트를 원하면 상위에서 로컬 state 도 함께 갱신.
    */
   onStatusCycle?: (nextStatus: TaskStatus) => void
+  /**
+   * 행 탭 → 편집 모달 오픈 콜백.
+   * grip / check 영역의 클릭은 data-no-edit 속성으로 제외된다.
+   */
+  onEdit?: () => void
 }
 
 /* --------------------------------------------------------------------------
@@ -155,6 +160,7 @@ export function TaskRow({
   labelText,
   time,
   onStatusCycle,
+  onEdit,
   className,
   ...props
 }: TaskRowProps) {
@@ -208,8 +214,19 @@ export function TaskRow({
       data-status={status}
       data-dragging={isDragging || undefined}
       role="listitem"
+      onClick={event => {
+        /* grip / checkbox 등 data-no-edit 을 가진 내부 요소 클릭은 편집 오픈을 막는다.
+         * closest 로 상위 체인을 훑어 버튼 내부의 아이콘/자식 클릭까지 안전하게 흡수. */
+        if (
+          onEdit &&
+          !(event.target as HTMLElement).closest('[data-no-edit="true"]')
+        ) {
+          onEdit()
+        }
+      }}
       className={cx(
         styles.root.base,
+        onEdit && 'cursor-pointer',
         labelColor ? borderLeftColorClass[labelColor] : 'border-l-border-primary',
         className,
       )}
@@ -219,6 +236,7 @@ export function TaskRow({
       <button
         type="button"
         aria-label="재정렬 핸들"
+        data-no-edit="true"
         className={styles.grip.base}
         {...attributes}
         {...listeners}
@@ -232,6 +250,7 @@ export function TaskRow({
         role="checkbox"
         aria-checked={ariaChecked}
         aria-label={checkAriaLabel}
+        data-no-edit="true"
         onClick={handleCheckClick}
         className={cx(
           styles.check.base,
