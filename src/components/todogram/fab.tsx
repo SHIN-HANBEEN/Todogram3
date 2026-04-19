@@ -15,7 +15,8 @@ import { cx, sortCx } from '@/utils/cx'
  *     아침 2초 체크가 핵심인 Todogram v1 의 정체성 반영
  *
  * 배치:
- *   - 모바일 전용 (`md:hidden`). 태블릿 이상은 sidebar 상단 '+ 새 태스크' 버튼으로 대체.
+ *   - 모바일+태블릿 전용 (`lg:hidden`). 데스크탑(1024px+)은 sidebar 상단
+ *     '+ 새 태스크' 버튼으로 대체 (BottomNav 와 동일한 브레이크포인트 정책).
  *   - bottom = 72px (BottomNav 높이) + 16px (gap) + env(safe-area-inset-bottom)
  *   - right = 16px (모바일 side padding 과 동일)
  *   - z-30 — BottomNav(z-40) 아래, 일반 컨텐츠 위. 모달 오픈 시 자연스레 가려짐.
@@ -65,10 +66,10 @@ const defaultAriaLabel: Record<FabLocale, string> = {
  * -------------------------------------------------------------------------- */
 const styles = sortCx({
   /* 고정 위치 — BottomNav(72px) 위 16px gap + iPhone 홈 인디케이터 safe-area.
-   * md:hidden — 태블릿 이상은 BottomNav 와 함께 숨김. */
+   * lg:hidden — 데스크탑(1024px+) 이상은 BottomNav 와 함께 숨김 (sidebar 로 대체). */
   position: {
     fixed:
-      'fixed right-4 z-30 md:hidden' +
+      'fixed right-4 z-30 lg:hidden' +
       ' bottom-[calc(theme(spacing.4)+72px+env(safe-area-inset-bottom))]',
   },
   visual: {

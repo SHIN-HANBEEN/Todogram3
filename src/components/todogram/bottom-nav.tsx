@@ -22,7 +22,8 @@ import { cx, sortCx } from '@/utils/cx'
  *
  * 구조:
  *   - 4탭: Today / Calendar / Labels / Settings (DESIGN.md §8 명세 순서)
- *   - 모바일 전용 (`md:hidden`). 태블릿 이상은 sidebar 로 대체 (DESIGN.md §6).
+ *   - 모바일+태블릿 전용 (`lg:hidden`). 데스크탑(1024px+)은 SidebarNav 로 대체
+ *     (DESIGN.md §6 — 태블릿은 단일 컬럼 유지, 데스크탑에서만 3컬럼 레이아웃 진입).
  *   - next/link + usePathname() 로 active 판별 — 외부 상태 관리 불필요.
  *
  * 접근성:
@@ -68,7 +69,10 @@ const tabs: BottomNavTab[] = [
   },
   {
     id: 'labels',
-    href: '/labels',
+    /* 라벨 관리 페이지는 `/settings/labels` 아래에 위치 (U4).
+     * 탭 href 를 실제 라우트에 맞추고, matchBestTab() 의 longest-prefix-wins 로
+     * Settings 탭과 겹치지 않게 해결. */
+    href: '/settings/labels',
     icon: Tag01,
     label: { ko: '라벨', en: 'Labels' },
   },
@@ -103,7 +107,7 @@ const styles = sortCx({
     /* 72px 높이 + env(safe-area-inset-bottom) 로 iPhone 홈 인디케이터 공간 확보.
      * fixed bottom — 모바일 전용. md 이상은 hidden. z-40 으로 FAB(z-30 가정)보다 위. */
     base:
-      'fixed inset-x-0 bottom-0 z-40 md:hidden' +
+      'fixed inset-x-0 bottom-0 z-40 lg:hidden' +
       ' flex h-[72px] items-center justify-around' +
       ' bg-bg-primary border-t border-border-primary' +
       ' px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]' +
@@ -140,12 +144,31 @@ const styles = sortCx({
 })
 
 /* --------------------------------------------------------------------------
- * 활성 판별 — pathname 이 tab.href 로 시작하면 활성.
- * 단, href='/settings' 가 '/settings/view' 에도 매칭되어야 하므로 startsWith 기반.
- * 정확 매칭 + prefix 매칭 (tab.href + '/') 둘 중 하나면 활성.
+ * 활성 판별 — "가장 긴 접두어 우선(longest-prefix-wins)" 규칙.
+ *
+ * 왜 단순 startsWith 로는 부족한가:
+ *   pathname='/settings/labels' 일 때,
+ *     - Labels(`/settings/labels`) 도 매칭 (exact)
+ *     - Settings(`/settings`)      도 매칭 (prefix)
+ *   단순 startsWith 로는 렌더 순서상 먼저 만나는 탭이 활성이 되어 버린다.
+ *
+ * 해법: 모든 tabs 중 pathname 과 매칭되는 항목 중 href 가 가장 긴 탭을 고른다.
+ *   - exact 매칭 (`pathname === tab.href`)
+ *   - prefix 매칭 (`pathname` 이 `${tab.href}/` 로 시작)
+ * 둘 중 하나면 후보로 인정. 후보가 여러 개면 가장 구체적인(href 가 긴) 탭이 승리.
+ * 어느 탭에도 매칭 안 되면 null — 활성 탭 없음 (예: `/login` 등 외부 라우트).
  * -------------------------------------------------------------------------- */
-function matchTab(pathname: string, tabHref: string): boolean {
-  return pathname === tabHref || pathname.startsWith(`${tabHref}/`)
+function matchBestTab(pathname: string): BottomNavTabId | null {
+  let best: { id: BottomNavTabId; length: number } | null = null
+  for (const tab of tabs) {
+    const isMatch =
+      pathname === tab.href || pathname.startsWith(`${tab.href}/`)
+    if (!isMatch) continue
+    if (best == null || tab.href.length > best.length) {
+      best = { id: tab.id, length: tab.href.length }
+    }
+  }
+  return best?.id ?? null
 }
 
 export function BottomNav({
@@ -156,6 +179,10 @@ export function BottomNav({
 }: BottomNavProps) {
   /* next/navigation 의 usePathname — 클라이언트 컴포넌트에서만 동작. 'use client' 선언 필요. */
   const pathname = usePathname()
+
+  /* activeTab prop 우선, 없으면 longest-prefix-wins 로 현재 pathname 에 맞는 탭 결정.
+   * tabs 배열을 map 돌기 전에 단 한 번만 계산 — O(N) 에서 O(1) 조회로 단순화. */
+  const resolvedActiveTab = activeTab ?? matchBestTab(pathname)
 
   /* ariaLabel 도 로케일 대응. 스크린리더 사용자에게 의미 있는 네비 이름 전달. */
   const navAriaLabel = locale === 'ko' ? '주요 네비게이션' : 'Primary navigation'
@@ -168,9 +195,7 @@ export function BottomNav({
       {...props}
     >
       {tabs.map(tab => {
-        /* activeTab prop 우선, 없으면 pathname 으로 판별. */
-        const isActive =
-          activeTab != null ? activeTab === tab.id : matchTab(pathname, tab.href)
+        const isActive = resolvedActiveTab === tab.id
         const Icon = tab.icon
         return (
           <Link
