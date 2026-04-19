@@ -312,10 +312,15 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - **서버 조립**: `src/app/(app)/settings/labels/page.tsx` — `requireUserId()` → labels 전량 + task_labels GROUP BY count 집계 → reserved sentinel 삽입 → `LabelsSettingsContainer` 에 전달. Server Action (`createLabel`/`updateLabel`/`deleteLabel`) 이 `revalidatePath('/settings/labels')` 담당하므로 낙관적 업데이트 없이 닫고 수렴.
   - **DESIGN.md Hard Rule 준수**: dust-blue 예약 · 48px 터치 타겟(색 셀 64px) · Pretendard + JetBrains Mono(숫자/헥스) · 시맨틱 토큰 only · 컨페티/사운드 없음.
   - `npm run typecheck` 통과 · `npx eslint src/components/settings src/app/(app)/settings` 0 에러.
-- [ ] **U5. 모바일 퍼스트 레이아웃 + 네비게이션**
-  - 파일: `src/app/(app)/layout.tsx`
-  - **성공 기준**: 모바일에서 콘텐츠 영역 ≥ 65% (설계 §12)
-  - UntitledUI sidebar-navigation 또는 header-navigation 선택
+- [x] **U5. 모바일 퍼스트 레이아웃 + 네비게이션**
+  - 파일: `src/app/(app)/layout.tsx`, `src/components/todogram/sidebar-nav.tsx`, `src/components/todogram/bottom-nav.tsx` (breakpoint/route 수정), `src/components/todogram/fab.tsx` (breakpoint 수정), `src/app/(app)/calendar/calendar-route-client.tsx` (h-dvh 조정).
+  - **성공 기준**: 모바일에서 콘텐츠 영역 ≥ 65% (DESIGN.md §12) — (app) 셸이 flex row 지만 SidebarNav 는 `hidden lg:flex` 라 모바일에서는 main 이 100% 차지.
+  - **구조**: `<AppShell flex min-h-dvh> [SidebarNav(lg+만)] [main flex-1] [BottomNav(fixed, lg:hidden)] </AppShell>` — 모바일/태블릿은 BottomNav + 100% main, 데스크탑(1024px+) 은 240px Sidebar + 나머지 main.
+  - **BottomNav 수정**: (1) `md:hidden` → `lg:hidden` (DESIGN.md §6 태블릿은 단일 컬럼 유지 → BottomNav 공유). (2) Labels 탭 href `/labels` → `/settings/labels` (U4 실제 라우트 반영). (3) 활성 판별을 `matchTab(startsWith)` → `matchBestTab(longest-prefix-wins)` 로 교체 — `/settings/labels` 방문 시 Labels 탭만 활성, Settings 탭은 비활성.
+  - **Fab 수정**: `md:hidden` → `lg:hidden` (BottomNav 와 브레이크포인트 동기화).
+  - **SidebarNav (신규)**: 240px 고정폭 · `sticky top-0 h-dvh` · 동일한 4탭 · 활성 시 왼쪽 2px sage 바(BottomNav underline 과 시각 대응) + `font-semibold` + sage 텍스트 · Instrument Serif 워드마크 "Todogram" 상단 고정 · 탭 높이 44px (데스크탑 포인터 기준).
+  - **캘린더 겹침 해결**: `calendar-route-client.tsx` 루트를 `h-dvh` → `h-[calc(100dvh-72px)] lg:h-dvh` 로 변경 — 모바일/태블릿에서 BottomNav(72px) 위로만 drill-down 영역이 차지하게 제한.
+  - `npm run typecheck` · `npm run build` 통과, U5 관련 파일 lint 추가 경고 0.
 - [x] **U0. LabelChip 컴포넌트 (4 variant × 3 size × 6 color)** 🎨 `/design-shotgun` A+B+C+D 승인
   - 파일: `src/components/todogram/label-chip.tsx`
   - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/labelchip-variants-20260416/board.html`
