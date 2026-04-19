@@ -215,12 +215,61 @@
 
 Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
 
-- [ ] **U1. Calendar View (월간, merge 표시)** 🚦 와이프 gate UI
-  - 파일: `src/app/(app)/calendar/page.tsx`, `src/components/calendar/`
-  - 같은 날짜 내 시간순 병합
-  - **외부 이벤트**: `border-border-secondary` + opacity-70, 클릭 비활성
-  - **Todogram task**: `border-brand` solid, 클릭 시 편집 모달
-  - 월 네비게이션 debounce (G3 캐시 활용)
+- [x] **U1. Calendar View (월간, merge 표시 + 3화면 drill-down)** 🚦 와이프 gate UI 🎨 `/design-html` A+B hybrid 승인 (+ C placeholder)
+  - ✅ **구현 완료 (Phase 4-U1, 2026-04-19)**: Screen A (CalendarMonthGrid) + Screen B (CalendarDayDetail) 2단 drill-down. Screen C 는 U6 에서 별도 구현 — 현재 `onSelectItem` 은 no-op 로 두어 행 탭이 통과만 되도록 함.
+  - **실제 파일 경로**:
+    - `src/app/(app)/layout.tsx` — 인증된 라우트 그룹 쉘
+    - `src/app/(app)/calendar/page.tsx` — 서버 컴포넌트: `requireUserId` → tasks/labels 조회 → G3 캐시 + G4 graceful fallback → `aggregateMonth` → `CalendarRouteClient` 주입
+    - `src/app/(app)/calendar/calendar-route-client.tsx` — 클라이언트 경계: `toggleTaskStatus` 래핑 + 월 네비 헤더 + 재로그인 배너
+    - `src/lib/calendar/{types,month,aggregate}.ts` — 도메인 타입 · timezone 기반 월 헬퍼 · tasks+events 병합 aggregator
+    - `src/components/calendar/{calendar-viewport,calendar-month-grid,calendar-compact-grid,calendar-day-cell,calendar-day-detail,calendar-day-row,task-status-indicator,status-count-badge}.tsx`
+  - **검증**: `npm run typecheck` ✅ / `npm run build` ✅ (/calendar 라우트 8.34 kB)
+  - 파일: `src/app/(app)/calendar/page.tsx`, `src/app/(app)/calendar/[date]/page.tsx`, `src/components/calendar/`
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/calendar-view-20260418/finalized.html` (확정 프로토타입, iterations: 4), `board.html` (A/B/C/D 비교)
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/calendar-view-20260418/approved.json` — A+B hybrid, drill-down 내비게이션, 토큰 매핑
+  - **finalized.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/calendar-view-20260418/finalized.json` — refinements 로그(swipe-hint 제거 · Screen C 추가 · indexOf 버그 수정 · 2-state→3-state 전환)
+  - **핵심 결정**: 3화면 drill-down. A (월 오버뷰) → 날짜 탭 → B (하루 상세, ribbon+ledger) → 행 탭 → C (아이템 상세 · Phase 4-U6 placeholder). C는 이 Phase 에서는 **뒤로가기 동작 검증용 스텁**이며 정식 구현은 U6.
+  - **Screen A — CalendarMonthGrid (Classic Grid)**: 7×5 월 그리드, 셀 ~52×104px, 셀 안에 3px colored left-tick bar + 제목 inline, +N overflow, 오늘(4/18) = sage solid circle, 데스크톱 `.screen.day:hover` 오버레이는 제거됨(파란 틴트 이슈).
+  - **Screen B — CalendarDayDetail (Ribbon Month + TodayRow Ledger)**: 상단 45% 압축 월 그리드(오늘/선택일 강조) + Instrument Serif date divider + 하단 55% 시간순 ledger. b-split 헤더에 3-state 미니 스워치 분포 표시 (`■1 ▓1 □2`) — 기존 `0/4` 카운터 대체.
+  - **Screen C — 아이템 상세 placeholder (Phase 4-U6 예정)**: 상단 ◀ 뒤로, 대형 JetBrains Mono 시간(28px) + 이탤릭 날짜 + 대형 편집 가능 제목 + 상태 라벨 row + 라벨 칩 + 메모 영역. **이 프로토타입은 drill-down 동작 검증만 담당** — 실제 UI는 U6 에서 재설계.
+  - **Task 상태 3-state 인디케이터** (U1 신규 도입, DB enum 매핑):
+    - DB enum: `pending` / `in_progress` / `done` (이 문서 L228 필터 정의와 일치)
+    - 시각 매핑: `pending` = 20×20 빈 사각 (border-primary 1.5px), `in_progress` = 하단 50% sage 채움 `linear-gradient(to top, var(--brand) 50%, transparent 50%)` + 진한 sage 테두리 2px + 행 배경 `color-mix(in srgb, var(--brand) 5%, transparent)` + 제목 `font-weight: 600`, `done` = 꽉 채움 sage + 흰 체크 + 제목 취소선 + 투명도 0.6.
+    - 상호작용: 체크 인디케이터 탭 → `pending → in_progress → done → pending` 순환 (단일 탭, `stopPropagation` 으로 row 클릭과 분리).
+    - 참조 메모리: `feedback_quiet_layer_status.md` — Quiet Layer 의 "미묘함"은 장식적 요소에만 적용, **기능적 상태 표현은 명확한 weight 구배 필수**.
+  - **Task vs External Event 스펙** (approved.json DESIGN 룰 계승):
+    - Todogram task: solid 3px left-tick (라벨 색), 행 클릭 → 상세(U6), 체크 인디케이터 탭 → 상태 전이
+    - External Google Cal event: **2px dashed dust-blue border**, opacity 0.85, **click-disabled** (`pointer-events: none` on row, chip 만 읽기). 체크 인디케이터 공간은 `visibility: hidden` 유지.
+  - **내비게이션/라우팅**:
+    - Phase 4-U1 은 **단일 `/calendar` 라우트 + 내부 슬라이드**로 시작 (프로토타입과 동일: `.viewport` 가 `translateX(0 / -100% / -200%)`로 A/B/C 전환)
+    - 추후 공유 URL 요구 생기면 `/calendar/[yyyy-mm]` / `/calendar/[yyyy-mm]/[dd]` 로 쪼개는 마이그레이션 가능 — v1 범위 밖.
+    - 뒤로가기: `◀` 버튼 / `ESC` / touch swipe-right → C→B→A 단계적 복귀.
+    - 월 네비게이션 `◀ ▶`: 300ms debounce + G3 캐시 히트 시 즉시 스왑, 미스 시 스켈레톤.
+  - **컴포넌트 분해**:
+    - `CalendarMonthGrid.tsx` — Screen A 월 그리드 (오버뷰·컴팩트 dual-mode, `variant: 'overview' | 'compact'`)
+    - `CalendarDayCell.tsx` — 셀 내부 3px left-tick bar + 제목 + +N overflow + 오늘 circle
+    - `CalendarDayDetail.tsx` — Screen B ribbon+ledger 컨테이너, `StatusCountBadge` 소비
+    - `TaskStatusIndicator.tsx` — 3-state 체크 인디케이터 (U0.7 TodayRow 와 공유 — 기존 이진 체크 대체)
+    - `StatusCountBadge.tsx` — `■N ▓N □N` 미니 스워치 (b-split 헤더용, TodayHeader 카운트와 다른 용도)
+    - `CalendarViewport.tsx` — A/B/C 슬라이드 컨테이너 (transform 기반, `motion-reduce:transition-none`)
+  - **도메인 모델 확장**: `Task.status: 'pending' | 'in_progress' | 'done'` (기존 `done: boolean` → enum 마이그레이션 필요). 프로토타입은 `todo/doing/done` 썼으나 **구현은 DB enum 직접 사용** (매퍼 없음).
+  - **G3 캐시 연동**: 월 이동 시 `getMonthCache(yyyy-mm)` 우선 조회, TTL 5min LRU. 프리페치: 현재 월 렌더 완료 후 전후 월 백그라운드 fetch.
+  - **G4 권한 해제 대응**: `user.google_status === 'revoked'` 이면 외부 이벤트 행 자리에 "Google 연결 끊김 — 재연결" 배너 렌더 (비침습적, ledger 상단 1회).
+  - **접근성**:
+    - 셀: `role="gridcell"` + `aria-label="4월 18일 토요일, 할 일 3건 완료 1건"` 형태
+    - 행: `role="button"` + `aria-label` 에 상태 포함(`"회의 준비 — 진행 중"`)
+    - 상태 체크: `role="button"` + `aria-pressed` + `aria-label="상태 변경: 진행 중 → 완료"`
+    - 외부 이벤트: `aria-disabled="true"` + `aria-label="외부 이벤트, 클릭 불가"`
+    - 월 네비 버튼: `aria-label="이전 달"` / `"다음 달"`, 키보드 ◀ ▶ 바인딩
+    - `prefers-reduced-motion`: viewport 슬라이드 transition → fade 로 폴백
+  - **성공 기준**:
+    - 월뷰에서 같은 날 task+event 가 시간순 merge 되어 left-tick 색으로 구분됨
+    - 날짜 탭 → B 슬라이드, 행 탭 → C 슬라이드, ◀/ESC/swipe-right 모두 단계적 뒤로 동작
+    - 체크 인디케이터 탭 → 3-state 순환, 행 클릭과 충돌 없음(stopPropagation 검증)
+    - 외부 이벤트 행은 클릭해도 내비게이션 발생 안 함(click-disabled)
+    - 월 네비 300ms debounce, G3 캐시 히트 시 스켈레톤 없이 스왑
+    - 모바일(≤768px)에서 콘텐츠 영역 ≥ 65% (설계 §12)
+  - **Open questions (v1 구현 중 해결)**: (a) Screen B ribbon 의 "월 그리드 45%" 가 태블릿 landscape 에서도 유효한지 → 브레이크포인트 확정, (b) 상태 3-state 순환에서 `done → pending` 시 confirm 다이얼로그 필요성(기본 없음, 재탭 undo 로 충분), (c) C 진입 시 URL 해시 반영 여부(v1.5).
 - [ ] **U2. List View (드래그 정렬 + 필터 + 검색)**
   - 파일: `src/app/(app)/list/page.tsx`, `src/components/task-list/`
   - 리스트 아이템 = `<TaskCard variant={user.taskCardStyle} />` (U6 컴포넌트 소비)
