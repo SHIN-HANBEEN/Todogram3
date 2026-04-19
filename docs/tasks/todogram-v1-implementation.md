@@ -538,9 +538,21 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - `src/components/providers/service-worker-register.tsx` — Client Component, `process.env.NODE_ENV === 'production'` 에서만 `navigator.serviceWorker.register('/sw.js')`. `layout.tsx` body 최상단에 mount
   - 검증: `npm run typecheck` 통과 · `npm run lint` 신규 오류 0 (기존 경고만) · 변경 파일 4종(layout.tsx / manifest.webmanifest / sw.js / service-worker-register.tsx) + 아이콘 4종
   - 남은 수동 테스트: iOS Safari 에서 공유 → "홈 화면에 추가" 시 sage T 아이콘 확인 · Android Chrome DevTools Lighthouse PWA 감사 → installable 표기 확인 (프로덕션 배포 후)
-- [ ] **P2. Dark mode audit**
-  - 이미 `next-themes` + UntitledUI 토큰 시스템 존재
-  - 모든 신규 페이지가 시맨틱 토큰(`bg-bg-primary` 등)만 사용하는지 확인
+- [x] **P2. Dark mode audit** _(2026-04-19)_
+  - 스코프: v1 커스텀 컴포넌트 — `src/components/{calendar,todogram,settings,task-form,task-list}/**` + `src/app/(app)/**` + `src/app/{login,signup,page,layout}.tsx`
+  - 스캔 1 (raw Tailwind 색상 클래스): 9개 파일 16건 발견 — `bg-brand-600`/`border-brand-600`/`outline-brand-600`/`text-white`/`bg-white`. 모두 DESIGN.md §9-1 Hard Rule #1 위반
+  - 스캔 2 (`dark:` 프리픽스): 0건. `@custom-variant dark` + `.dark-mode` 패턴 준수 ✅
+  - 스캔 3 (violet/purple/indigo raw): 0건. Sage 브랜드 토큰만 사용 ✅
+  - 수정 — 시맨틱 토큰으로 교체:
+    - `bg-brand-600` → `bg-bg-brand-solid` (다크모드에서 sage `#3A6E5B` → `#6FA58C` 명도 상승, DESIGN.md §4-5)
+    - `border-brand-600` → `border-border-brand` (다크에서 sage visible)
+    - `outline-brand-600` → `outline-brand` (UntitledUI 표준 패턴, `button.tsx`·`pin-input.tsx` 참조)
+    - `text-white` → `text-text-primary_on-brand` (다크에서 warm cream `#F0EEE7` 반전)
+    - `bg-white` (toggle thumb) → `bg-fg-white` (UntitledUI `Toggle` 표준)
+  - 추가 정리 — arbitrary value 내 `var(--color-brand-600)` → `var(--color-bg-brand-solid)` 로 교체 (`color-mix` hover/active tint, in_progress 그라디언트). 다크모드에서 sage 가 밝아지지 않아 tint 가 보이지 않던 문제 해소
+  - 수정 파일 11종: `calendar/{task-status-indicator,calendar-compact-grid,calendar-day-cell,calendar-day-row,calendar-viewport,status-count-badge}.tsx`, `todogram/{fab,today-row,sidebar-nav}.tsx`, `settings/{labels-list-strip,label-editor-sheet}.tsx`, `task-list/task-row.tsx`, `task-form/task-form-sheet.tsx`, `app/(app)/calendar/calendar-route-client.tsx`
+  - 검증: `npm run typecheck` 통과 · `npm run lint` 신규 오류 0 (기존 `_item`/`CALENDAR_LABEL_ID` unused 경고만 잔존) · `npm run build` 통과(10/10 페이지 정적 생성 성공, Tailwind 클래스 유효성 확인)
+  - 재스캔 결과: v1 스코프 내 raw Tailwind 색상 클래스 0건, `var(--color-brand-600)` 참조 0건
 - [ ] **P3. 한국어 localization audit**
   - 하드코딩된 영어 문자열 제거 (설계 "한국어만" 원칙)
 - [ ] **P4. Vercel 배포**
