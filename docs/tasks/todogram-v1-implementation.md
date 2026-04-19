@@ -270,12 +270,18 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
     - 월 네비 300ms debounce, G3 캐시 히트 시 스켈레톤 없이 스왑
     - 모바일(≤768px)에서 콘텐츠 영역 ≥ 65% (설계 §12)
   - **Open questions (v1 구현 중 해결)**: (a) Screen B ribbon 의 "월 그리드 45%" 가 태블릿 landscape 에서도 유효한지 → 브레이크포인트 확정, (b) 상태 3-state 순환에서 `done → pending` 시 confirm 다이얼로그 필요성(기본 없음, 재탭 undo 로 충분), (c) C 진입 시 URL 해시 반영 여부(v1.5).
-- [ ] **U2. List View (드래그 정렬 + 필터 + 검색)**
-  - 파일: `src/app/(app)/list/page.tsx`, `src/components/task-list/`
-  - 리스트 아이템 = `<TaskCard variant={user.taskCardStyle} />` (U6 컴포넌트 소비)
-  - `@dnd-kit/sortable` 또는 유사 라이브러리로 드래그
-  - 필터: 상태(pending/in_progress/done) + 라벨 multiselect
-  - 검색: title + notes full-text (v1은 단순 ILIKE)
+- [x] **U2. List View (Status Sections / Kanban-lite)** 🎨 `/design-shotgun` Variant C 승인 (2026-04-19)
+  - 파일: `src/app/(app)/list/page.tsx`, `src/components/task-list/` (`task-list-view.tsx`, `status-section.tsx`, `task-row.tsx`, `search-box.tsx`, `label-filter-rail.tsx`)
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/list-view-20260419/board.html`
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/list-view-20260419/approved.json`
+  - **전략**: 상태 필터를 섹션 구조로 승격. 3개 고정 섹션(대기 · 진행 중 · 완료), 섹션 간 드래그 = 상태 전이. 리스트 아이템은 U6 `TaskCard` 를 소비하지 않고 compact row geometry 고정(섹션이 이미 밀도 구배 제공).
+  - **섹션 스펙**: 고정 순서 `pending → in_progress → done`. 기본 접힘 상태 `{pending:false, in_progress:false, done:true}`. 섹션 헤더 sticky(top: filter-rail bottom), status-dot + 한글 라벨 + 카운트(JetBrains Mono), caret rotation 180° on collapse.
+  - **Row geometry** (compact 고정, `user.taskCardStyle` 무시): `[grip 16 · check 18 · title flex · time · chip-meta]`, min-height 48px, left 3px label tick, 섹션 내부 row gap 2px, 섹션 간 gap 18px.
+  - **DnD**: `@dnd-kit/sortable` + `@dnd-kit/core` 멀티 컨테이너. 같은 섹션 내 드래그 = position 재정렬, 섹션 간 드래그 = `updateTaskPosition(id, newPosition, newStatus?)` Server Action 으로 상태 전이 동시 적용. `done` 으로 이동 시 `doneAt = now()` 자동 세팅, `done` 에서 빠져나가면 `doneAt = null`.
+  - **필터**: 라벨 multiselect 는 상단 sticky rail(dust-blue 는 캘린더 예약이라 제외 → 5색). 상태 필터는 UI 에서 제거됨(섹션이 대체). 라벨 + 섹션 + 검색 = **AND 합성**.
+  - **검색**: title + notes ILIKE, 200ms debounce, 40px input. 검색 결과도 섹션 구조 유지(사용자 명시 요구 — "검색 결과도 대기 / 진행 중 / 완료로 구분").
+  - **접근성**: 섹션 헤더 `role=button aria-expanded`, row `role=listitem`, check `role=checkbox aria-checked`, 섹션 간 드래그 `aria-live=polite` 상태 전이 안내.
+  - **Open questions (v1 구현 중 해결)**: (a) 섹션 헤더 sticky 가 라벨 rail sticky 와 겹칠 때 z-index / offset, (b) `done` 섹션 접힘 상태 localStorage 영속 여부, (c) 검색 시 done 섹션 자동 펼침 여부, (d) 빈 섹션 표시 방식(숨김 vs "항목 없음"), (e) 섹션 간 드래그 중 다른 섹션이 접혀있을 때 UX.
 - [ ] **U3. Task 생성/편집 모달**
   - 파일: `src/components/task-form/`
   - React Hook Form + Zod (설계 §9 기존 스타터 활용)
