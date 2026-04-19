@@ -60,7 +60,7 @@ const defaultAriaLabel: Record<FabLocale, string> = {
  * 컬러 매핑 (DESIGN.md §4 시맨틱 토큰만 사용, §9-1):
  *   - `bg-bg-brand-solid`         ≈ DESIGN --brand (sage #3A6E5B / dark #6FA58C)
  *   - `bg-bg-brand-solid_hover`   ≈ DESIGN --brand-hover
- *   - `text-white`                ≈ 아이콘 흰색 고정 (sage 위 최대 대비)
+ *   - `text-text-primary_on-brand` ≈ 브랜드 배경 위 텍스트/아이콘 (라이트 white / 다크 warm cream)
  *   - `outline-focus-ring`        ≈ 키보드 포커스 sage 링
  *   - `shadow-float`              ≈ DESIGN §6 플로팅 요소 그림자
  * -------------------------------------------------------------------------- */
@@ -77,7 +77,7 @@ const styles = sortCx({
      * 아이콘은 내부 중앙 정렬. */
     base:
       'inline-flex items-center justify-center size-14 rounded-full' +
-      ' bg-bg-brand-solid text-white shadow-float' +
+      ' bg-bg-brand-solid text-text-primary_on-brand shadow-float' +
       ' hover:bg-bg-brand-solid_hover' +
       ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring' +
       ' disabled:cursor-not-allowed disabled:opacity-50',

@@ -122,7 +122,7 @@ const styles = sortCx({
     base:
       'relative flex h-11 items-center gap-3 rounded-lg pl-[14px] pr-3' +
       ' text-text-tertiary transition-colors duration-100 ease-linear' +
-      ' hover:bg-[color-mix(in_srgb,var(--color-brand-600)_6%,transparent)] hover:text-text-secondary' +
+      ' hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_6%,transparent)] hover:text-text-secondary' +
       ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
     active:
       /* 활성: sage 텍스트 + 왼쪽 2px 수직 바. bar 는 ::before 대신 별도 span 으로 넣어

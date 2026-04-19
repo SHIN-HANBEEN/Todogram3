@@ -128,7 +128,7 @@ const styles = sortCx({
       'border-border-brand' +
       ' [background-image:linear-gradient(to_right,var(--color-bg-brand-solid)_50%,transparent_50%)]',
     done:
-      'border-bg-brand-solid bg-bg-brand-solid text-white' +
+      'border-bg-brand-solid bg-bg-brand-solid text-text-primary_on-brand' +
       ' hover:border-bg-brand-solid_hover hover:bg-bg-brand-solid_hover',
   },
   title: {

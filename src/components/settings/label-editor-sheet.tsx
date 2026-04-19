@@ -284,7 +284,7 @@ export function LabelEditorSheet({
                 className={cx(
                   'inline-flex min-h-12 items-center justify-center rounded-full',
                   'px-4 text-[14px] font-semibold',
-                  'bg-bg-brand-solid text-white',
+                  'bg-bg-brand-solid text-text-primary_on-brand',
                   'hover:bg-bg-brand-solid_hover',
                   'disabled:cursor-not-allowed disabled:opacity-50',
                   'focus-visible:outline focus-visible:outline-2',
@@ -399,7 +399,7 @@ export function LabelEditorSheet({
                             aria-hidden="true"
                             className={cx(
                               'absolute top-1.5 right-1.5 inline-flex size-4 items-center justify-center',
-                              'rounded-full bg-bg-brand-solid text-white'
+                              'rounded-full bg-bg-brand-solid text-text-primary_on-brand'
                             )}
                           >
                             <Check className="size-3" />

@@ -100,7 +100,7 @@ export function LabelsListStrip({
           className={cx(
             'inline-flex min-h-10 items-center gap-1.5 rounded-full',
             'px-3.5 text-[13px] font-semibold',
-            'bg-bg-brand-solid text-white hover:bg-bg-brand-solid_hover',
+            'bg-bg-brand-solid text-text-primary_on-brand hover:bg-bg-brand-solid_hover',
             'focus-visible:outline focus-visible:outline-2',
             'focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
             'transition duration-100 ease-linear'

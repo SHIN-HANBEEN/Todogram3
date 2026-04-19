@@ -530,7 +530,7 @@ export function TaskFormSheet({
                 className={cx(
                   'inline-flex min-h-12 items-center justify-center rounded-full',
                   'px-4 text-[14px] font-semibold',
-                  'bg-bg-brand-solid text-white',
+                  'bg-bg-brand-solid text-text-primary_on-brand',
                   'hover:bg-bg-brand-solid_hover',
                   'disabled:cursor-not-allowed disabled:opacity-50',
                   'focus-visible:outline focus-visible:outline-2',
@@ -865,7 +865,7 @@ function ToggleSwitch({
       >
         <span
           className={cx(
-            'absolute top-0.5 left-0.5 block size-5 rounded-full bg-white shadow-sm',
+            'absolute top-0.5 left-0.5 block size-5 rounded-full bg-fg-white shadow-sm',
             'transition-transform duration-150 ease-linear',
             checked && 'translate-x-5'
           )}

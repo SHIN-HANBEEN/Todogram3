@@ -105,7 +105,7 @@ const styles = sortCx({
       ' focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring' +
       ' hover:border-border-brand',
     completed:
-      'bg-bg-brand-solid border-bg-brand-solid text-white' +
+      'bg-bg-brand-solid border-bg-brand-solid text-text-primary_on-brand' +
       ' hover:bg-bg-brand-solid_hover hover:border-bg-brand-solid_hover',
   },
   titleWrap: {
