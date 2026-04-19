@@ -530,9 +530,14 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
 
 ## 🚀 Phase 6: PWA + Polish (Day 7)
 
-- [ ] **P1. PWA manifest + service worker**
-  - `public/manifest.json`, `src/app/layout.tsx`에 `<link>`
-  - iOS/Android 홈 화면 추가 테스트
+- [x] **P1. PWA manifest + service worker** _(2026-04-19)_
+  - `public/manifest.webmanifest` 생성 — Todogram 메타(name/description/lang=ko), `theme_color=#3A6E5B` (Sage), `background_color=#FFFFFF`, `display=standalone`, `start_url=/list`, 아이콘 3종(192/512/maskable-512) 등록
+  - `public/icons/` 에 SVG 아이콘 4종 생성 — `icon-192.svg`, `icon-512.svg`, `icon-maskable-512.svg` (Android adaptive safe-zone 대응), `apple-touch-icon.svg` (180). Sage green 바탕 + Instrument Serif "T" 워드마크
+  - `src/app/layout.tsx` — Next.js Metadata API 로 `manifest`, `icons`, `appleWebApp`, `applicationName`, `formatDetection` 주입. `viewport` 에 `themeColor` (라이트 `#3A6E5B` / 다크 `#1F2A26`), `viewportFit=cover`, `maximumScale=5` 설정
+  - `public/sw.js` — 최소 Service Worker (install skipWaiting / activate clients.claim / fetch no-op). 오프라인 캐시는 v1 스코프 제외(v2+) — installability 요건만 충족
+  - `src/components/providers/service-worker-register.tsx` — Client Component, `process.env.NODE_ENV === 'production'` 에서만 `navigator.serviceWorker.register('/sw.js')`. `layout.tsx` body 최상단에 mount
+  - 검증: `npm run typecheck` 통과 · `npm run lint` 신규 오류 0 (기존 경고만) · 변경 파일 4종(layout.tsx / manifest.webmanifest / sw.js / service-worker-register.tsx) + 아이콘 4종
+  - 남은 수동 테스트: iOS Safari 에서 공유 → "홈 화면에 추가" 시 sage T 아이콘 확인 · Android Chrome DevTools Lighthouse PWA 감사 → installable 표기 확인 (프로덕션 배포 후)
 - [ ] **P2. Dark mode audit**
   - 이미 `next-themes` + UntitledUI 토큰 시스템 존재
   - 모든 신규 페이지가 시맨틱 토큰(`bg-bg-primary` 등)만 사용하는지 확인
