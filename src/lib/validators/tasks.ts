@@ -202,3 +202,53 @@ export const listTasksInputSchema = z
   .optional()
 
 export type ListTasksInput = z.infer<typeof listTasksInputSchema>
+
+// ---- Phase 4 U2 (List View) 전용 스키마 ----
+
+/**
+ * updateTaskPosition 입력 스키마 — 리스트 뷰 드래그 재정렬 + 섹션 간 이동 전용.
+ * - newPosition: DB tasks.position 정렬값(양의 정수, 1 기반). 대상 위치에 놓일 값.
+ *   같은 사용자 범위 내에서 유일할 필요는 없다. Server Action 안에서 인근 row 를
+ *   shift 하는 전략으로 충돌을 해소한다 (actions/tasks.ts 주석 참조).
+ * - newStatus: 섹션 간 드래그(= 상태 전이) 시에만 전달. 생략/undefined → 같은 섹션
+ *   내부 재정렬. 전달된 경우 updateTask 와 동일한 doneAt 동기화 규칙 적용.
+ */
+export const updateTaskPositionInputSchema = z.object({
+  newPosition: z.coerce
+    .number({ message: '새 position 값이 필요합니다.' })
+    .int('position 은 정수여야 합니다.')
+    .positive('position 은 양수여야 합니다.'),
+  newStatus: taskStatusSchema.optional(),
+})
+
+export type UpdateTaskPositionInput = z.infer<typeof updateTaskPositionInputSchema>
+
+/**
+ * searchTasks 입력 스키마 — 리스트 뷰 검색 박스 전용.
+ * - query: 검색어. 공백만 있거나 빈 문자열이면 null 로 정규화 → 호출자가 "검색 없음"
+ *   으로 판단하고 listTasksWithLabels 를 대신 호출하는 분기가 가능.
+ * - labelId: 라벨 필터(단일). 생략 시 전체. 0 이하 또는 'all' 같은 특수값은 UI 층에서
+ *   제거하고 여기로 넘기지 않는다 (v1 정책 — 'all' 은 undefined 로 전송).
+ *
+ * v1 구현 주의사항:
+ *   - ILIKE 는 `%` / `_` / `\` 를 특수문자로 취급하므로 Server Action 안에서 반드시
+ *     이스케이프 처리 후 질의한다 (actions/tasks.ts 에서 처리).
+ *   - 검색어 최소 길이 제한은 두지 않는다 (1자 검색이 자연스러운 한국어 UX).
+ *   - 최대 길이는 title 과 동일한 200자로 제한 — 그 이상은 폼 공격성 의심.
+ */
+export const searchTasksInputSchema = z.object({
+  query: z
+    .string()
+    .max(TASK_TITLE_MAX_LENGTH, `검색어는 ${TASK_TITLE_MAX_LENGTH}자 이내여야 합니다.`)
+    .transform(value => {
+      const trimmed = value.trim()
+      return trimmed === '' ? null : trimmed
+    }),
+  labelId: z.coerce
+    .number({ message: 'labelId 는 정수여야 합니다.' })
+    .int('labelId 는 정수여야 합니다.')
+    .positive('labelId 는 양수여야 합니다.')
+    .optional(),
+})
+
+export type SearchTasksInput = z.infer<typeof searchTasksInputSchema>

@@ -97,3 +97,43 @@ export function getLabelColor(id: LabelId): LabelChipColor {
 export function isCalendarLabel(id: LabelId): boolean {
   return id === CALENDAR_LABEL_ID
 }
+
+/* --------------------------------------------------------------------------
+ * HEX_TO_LABEL_COLOR — Label.color (#RRGGBB) → LabelChipColor slug 매핑.
+ *
+ * DB 의 truth 는 hex (`src/db/schema/labels.ts`) 이고, UI 컴포넌트(LabelChip /
+ * TaskRow 의 좌측 틱)는 토큰 기반 slug 로만 렌더된다. 중간에 매핑이 없으면
+ * 라벨이 항상 회색으로 떨어져 Quiet Layer 의 색 위계가 사라진다.
+ *
+ * 값은 `src/app/theme.css` 의 `--color-label-*` 라이트 모드 값 그대로.
+ * 다크 모드 값도 포함해 사용자가 dark-mode 에서 만든 라벨이 라이트로 돌아와도
+ * 정상 해석되도록 함. 대소문자 비일관(#3A6E5B vs #3a6e5b) 을 흡수하기 위해
+ * 저장 시 toLowerCase 로 정규화한 뒤 조회.
+ * -------------------------------------------------------------------------- */
+const HEX_TO_LABEL_COLOR: Record<string, LabelChipColor> = {
+  /* light mode */
+  '#3a6e5b': 'sage',
+  '#b3573a': 'terracotta',
+  '#5a7a99': 'dust-blue',
+  '#c08a3e': 'amber',
+  '#8c5a6e': 'plum',
+  '#7a8b4a': 'moss',
+  /* dark mode (사용자가 다크에서 색을 고른 경우에도 동일 slug 로 환원) */
+  '#6fa58c': 'sage',
+  '#d68966': 'terracotta',
+  '#87a4be': 'dust-blue',
+  '#d9ac70': 'amber',
+  '#b18597': 'plum',
+  '#a5b57e': 'moss',
+}
+
+/**
+ * hexToLabelColor — '#RRGGBB' 문자열을 LabelChipColor slug 로 변환.
+ * 알려진 값이 아니면 'moss' 로 폴백 (v1 단계에서는 UI 가 절대 깨지지 않는
+ * 안전한 기본값. 사용자가 커스텀 hex 를 넣을 수 있는 v1.5 부터는 컬러피커를
+ * 미리 정의된 팔레트로 제한하거나 더 정교한 근접 매핑을 도입할 수 있음).
+ */
+export function hexToLabelColor(hex: string): LabelChipColor {
+  const normalized = hex.trim().toLowerCase()
+  return HEX_TO_LABEL_COLOR[normalized] ?? 'moss'
+}
