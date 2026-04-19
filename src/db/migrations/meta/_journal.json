@@ -8,6 +8,13 @@
       "when": 1776469472773,
       "tag": "0000_init_todogram_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1776579884096,
+      "tag": "0001_drop_task_card_style",
+      "breakpoints": true
     }
   ]
 }

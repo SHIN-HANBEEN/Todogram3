@@ -19,15 +19,8 @@ export const googleAuthStatusEnum = pgEnum('google_auth_status', [
   'expired',
 ])
 
-// TaskCard 뷰 밀도 선택지. Phase 4 - U6 / U7 에서 사용. default = 'comfortable'
-// (Soft Card 변형이 일반 사용자에게 권장되는 차분한 분위기).
-export const taskCardStyleEnum = pgEnum('task_card_style', [
-  'compact',
-  'comfortable',
-])
-
 // 사용자 테이블 — Phase 1 Auth 에서 NextAuth Google Provider 가 최초 로그인 시 upsert.
-// 설계 §8-2 DDL 기반 + F1 명세에 따른 3개 필드(timezone, google_auth_status, task_card_style) 추가.
+// 설계 §8-2 DDL 기반 + F1 명세에 따른 2개 필드(timezone, google_auth_status) 추가.
 export const users = pgTable('users', {
   // 기존 v1 auth 호환 위해 SERIAL 유지.
   id: serial('id').primaryKey(),
@@ -53,10 +46,6 @@ export const users = pgTable('users', {
   // Phase 5 rollover cron 에서 "오늘 00:00"을 사용자 시간대로 계산할 때 사용. §8-4.
   // Intl TZ 식별자(`Asia/Seoul`, `America/Los_Angeles` ...) 를 저장한다.
   timezone: text('timezone').notNull().default('Asia/Seoul'),
-  // TaskCard 렌더링 밀도. Phase 4 - U7 Settings > 뷰 밀도 토글에서 변경.
-  taskCardStyle: taskCardStyleEnum('task_card_style')
-    .notNull()
-    .default('comfortable'),
 
   // ---- 메타 ----
   createdAt: timestamp('created_at', { withTimezone: true })

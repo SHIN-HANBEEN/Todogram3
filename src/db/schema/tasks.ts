@@ -15,7 +15,7 @@ import { rolloverLogs } from './rollover-logs'
 
 // 할 일(task). Todogram 의 핵심 엔티티. 설계 §8-2.
 // status 는 설계 DDL 에서 TEXT 로 정의됨 → 앱 레이어(Zod)에서 'pending'|'in_progress'|'done' 검증.
-// (google_auth_status / task_card_style 과 달리 값이 확장될 여지가 있어서 ENUM 승격을 유보.)
+// (google_auth_status 와 달리 값이 확장될 여지가 있어서 ENUM 승격을 유보.)
 export const tasks = pgTable(
   'tasks',
   {
