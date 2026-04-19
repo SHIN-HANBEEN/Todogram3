@@ -401,10 +401,23 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
 
 ## ⏰ Phase 5: Auto-rollover (Day 6, Lane H 병렬)
 
-- [ ] **R1. Cron endpoint + CRON_SECRET 검증**
+- [x] **R1. Cron endpoint + CRON_SECRET 검증** ✅ 2026-04-19
   - 파일: `src/app/api/cron/rollover/route.ts`
   - `Authorization: Bearer $CRON_SECRET` 체크 (없으면 401)
   - Todogram task만 대상 (외부 이벤트 건드리지 않음)
+  - 구현 요약:
+    - `runtime = 'nodejs'` + `dynamic = 'force-dynamic'` 강제 → Edge 번들 회피 + 캐시 차단.
+    - `timingSafeEqual` 기반 상수 시간 토큰 비교(길이 불일치는 조용히 false).
+    - Bearer 토큰 앞뒤 공백 trim 으로 복사-붙여넣기 허용. Bearer 외 스킴은 모두 401.
+    - 인증 성공 시 `{ ok: true, rolledOver: 0, pending: 'R2' }` 응답 — R2 가 랜딩되면 이
+      계약을 깨면서 실제 이월 수/에러 요약을 주입하는 지점이 된다.
+  - 테스트: `test/unit/cron-rollover-auth.test.ts` (5 케이스 전부 통과)
+    - 헤더 부재 → 401 + `{ error: 'Unauthorized' }`
+    - Basic 스킴 → 401
+    - 잘못된 Bearer 토큰 → 401
+    - 정상 Bearer 토큰 → 200 + R2 pending 응답
+    - 앞뒤 공백 포함 Bearer 토큰 → 200 (trim 확인)
+  - 확인 명령: `npx vitest run test/unit/cron-rollover-auth.test.ts` · `npx tsc --noEmit` · `npx next lint`
 - [ ] **R2. Per-user timezone 해소**
   - 파일: `src/lib/rollover.ts`
   - 각 user의 `timezone`으로 "오늘 00:00" 계산 (date-fns-tz 또는 Intl)
