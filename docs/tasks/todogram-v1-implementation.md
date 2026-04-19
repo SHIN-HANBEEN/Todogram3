@@ -418,18 +418,113 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
     - 정상 Bearer 토큰 → 200 + R2 pending 응답
     - 앞뒤 공백 포함 Bearer 토큰 → 200 (trim 확인)
   - 확인 명령: `npx vitest run test/unit/cron-rollover-auth.test.ts` · `npx tsc --noEmit` · `npx next lint`
-- [ ] **R2. Per-user timezone 해소**
-  - 파일: `src/lib/rollover.ts`
-  - 각 user의 `timezone`으로 "오늘 00:00" 계산 (date-fns-tz 또는 Intl)
+- [x] **R2. Per-user timezone 해소** ✅ 2026-04-19
+  - 파일: `src/lib/rollover.ts` (신규), `src/app/api/cron/rollover/route.ts` (R2 배선 추가)
+  - 각 user의 `timezone`으로 "오늘 00:00" 계산 (Intl.DateTimeFormat 기반 — date-fns-tz 미도입)
   - `user별 try/catch + Promise.allSettled` (한 유저 실패가 다른 유저 차단 금지)
-- [ ] **R3. rollover_logs 중복 방지**
-  - `(task_id, rolled_at)` PK 기반 dedup
-  - `FOR UPDATE SKIP LOCKED` 또는 `updated_at` 낙관적 락 (동시 편집 방지)
-- [ ] **R4. vercel.json cron 설정**
-  - `{ "crons": [{ "path": "/api/cron/rollover", "schedule": "5 0 * * *" }] }`
-  - ⚠️ Vercel Cron은 UTC 기준이라 실제 user timezone 계산은 R2에서 해결
+  - 구현 요약:
+    - `getTimezoneOffsetMs` + `zonedDateToUtc`: `Intl.DateTimeFormat.formatToParts` 로 TZ 오프셋을 구해
+      로컬 Y/M/D/H/m/s → UTC 인스턴트 변환. DST 경계에서 2차 보정 루프로 수렴.
+    - `computeTodayStartUtc`: 사용자 TZ 기준 "가장 최근 지난 로컬 자정" 을 UTC 로 반환. cron
+      WHERE 절의 `due_at < ?` 에 주입된다.
+    - `shiftDueAtToToday`: 원래 due_at 의 로컬 시분초를 보존하면서 날짜만 오늘로 교체
+      (§8-4 "시간은 유지").
+    - `runForEachUser`: 범용 격리 오케스트레이터. `Promise.allSettled` + non-Error 거부 Error wrap.
+    - `rolloverSingleUser`: user_id / rollover_enabled=true / status≠done / due_at<todayStart 조건으로
+      Drizzle SELECT → 각 task 를 `shiftDueAtToToday` 로 UPDATE. R3 전이므로 rollover_logs 삽입과
+      `FOR UPDATE SKIP LOCKED` 는 아직 없음 (자연 멱등성은 `due_at < todayStart` 조건이 확보).
+    - `runDailyRollover`: 전체 user 로드 → `runForEachUser` 로 격리 실행 → 집계. DB/now 주입 가능해
+      단위 테스트에서 fake 주입 가능.
+    - 라우트: 인증 통과 후 `runDailyRollover()` 호출. 본체 예외는 바깥 try/catch 로 500 + 최소 바디.
+      성공 시 `{ ok, rolledOver, failed, failures }` 포맷으로 Vercel Logs 에서 관측 가능.
+  - 테스트:
+    - `test/unit/rollover-timezone.test.ts` (15 케이스): offset/zonedDateToUtc/computeTodayStartUtc/
+      shiftDueAtToToday 의 KST·UTC·PDT·PST·DST 경계 전반을 고정 날짜로 검증.
+    - `test/unit/rollover-isolation.test.ts` (5 케이스): `runForEachUser` 의 전부 성공/부분 실패/
+      non-Error 거부/빈 입력/병렬 실행 계약 검증.
+    - `test/unit/cron-rollover-auth.test.ts` 재작성 (8 케이스): `runDailyRollover` 를 `vi.mock` 으로
+      스텁. 인증 4케이스 유지 + 본체 호출 3케이스(결과 포장/trim/본체 예외→500) 추가.
+  - 확인 명령: `npx vitest run test/unit/rollover-*.test.ts test/unit/cron-rollover-auth.test.ts` ·
+    `npx vitest run` (248 전체 그린) · `npx tsc --noEmit` · `npx next lint` (신규 에러 없음)
+- [x] **R3. rollover_logs 중복 방지** ✅ 2026-04-19
+  - 파일: `src/lib/rollover.ts` (IO 어댑터 + 트랜잭션 판본으로 전환),
+    `src/app/api/cron/rollover/route.ts` (헤더 주석만 R3 반영)
+  - `(task_id, rolled_at)` PK 기반 dedup + `FOR UPDATE SKIP LOCKED` 동시성 락 완성
+  - 구현 요약:
+    - `RolloverIO` / `RolloverTxIO` 어댑터 경계 신설. 프로덕션 경로는 `makeDrizzleRolloverIO(db)`
+      가 실 Drizzle 을 감싸고, 단위 테스트는 in-memory fake 를 주입할 수 있다. R2 의 `db`
+      주입 옵션은 레거시 편의로 유지 (`io` 가 우선).
+    - `rolloverSingleUser` 가 `io.withTransaction` 으로 감싸져 사용자당 단일 BEGIN/COMMIT.
+      `tx.select(...).for('update', { skipLocked: true })` 로 후보를 잠그며 조회 — 다른
+      세션이 편집 중인 태스크는 기다리지 않고 이번 사이클에서 skip (다음 cron 에서 재시도).
+    - `tryClaimRolloverLog` 가 `INSERT ... ON CONFLICT DO NOTHING RETURNING` 로 원자 claim.
+      RETURNING 이 빈 배열이면 같은 (task_id, rolled_at) 이 이미 존재 → `shiftTaskDueAt` 자체를
+      호출하지 않아 "로그 없이 due_at 만 갱신" 경로가 원천 차단된다.
+    - `computeTodayDateString(timezone, now)` 헬퍼 추가 — 사용자 TZ 기준 `YYYY-MM-DD` 를
+      `rolled_at` DATE 컬럼 키로 사용. `en-CA` 로케일이 ISO-ish 포맷을 보장.
+    - 멱등성 두 겹: (1) 첫 실행 뒤 `due_at` 이 오늘로 갱신되어 `lt(due_at, today_start)` 필터에서
+      자연 제외, (2) 그럼에도 후보로 들어오더라도 PK 가 두 번째 INSERT 를 거부.
+  - 테스트:
+    - `test/unit/rollover-timezone.test.ts` — `computeTodayDateString` 5 케이스 추가 (KST
+      자정 경계 14:59/15:00 UTC, UTC 사용자, PDT 사용자 전날 밤).
+    - `test/unit/rollover-dedup.test.ts` (신규, 6 케이스) — fake `RolloverIO` 로
+      첫 실행 이월 + PK 기록, 같은 UTC 날짜 재호출 0건, PK 충돌 시 UPDATE 미호출, SKIP LOCKED
+      건너뛰기, 다중 사용자 격리 트랜잭션, done/opt-out 태스크 제외 검증.
+    - 기존 `rollover-isolation.test.ts` / `cron-rollover-auth.test.ts` 무수정 호환.
+  - 확인 명령: `npx vitest run test/unit/rollover-*.test.ts test/unit/cron-rollover-auth.test.ts`
+    (36 그린) · `npx vitest run` (259 전체 그린) · `npx tsc --noEmit` · `npx next lint` (신규 에러 없음)
+- [x] **R4. vercel.json cron 설정** ✅ 2026-04-19
+  - 파일: `vercel.json` (신규, 프로젝트 루트)
+  - 구현 요약:
+    - `crons` 배열에 단일 엔트리(`path: /api/cron/rollover`, `schedule: 5 0 * * *`) 등록.
+      Vercel Cron 이 매일 **UTC 00:05** 에 GET 으로 해당 라우트를 호출한다.
+    - `$schema` 로 Vercel 공식 스키마(`https://openapi.vercel.sh/vercel.json`) 를 지정 →
+      편집기에서 오타/미지원 키를 즉시 하이라이트.
+    - Vercel Cron 은 기본적으로 UTC 기준이라 "한국 사용자 00:05" 가 아니라 "UTC 00:05"
+      (= KST 09:05) 에 깨어난다. 실제 사용자별 "오늘 00:00" 계산은 R2 의
+      `computeTodayStartUtc` 가 `users.timezone` 으로 처리하므로 cron 스케줄 자체는
+      하루 1회만 보장하면 충분하다.
+    - 스케줄을 00:00 대신 **00:05** 로 민 이유: Vercel 내부 트리거 지연 / DB 시간 drift
+      버퍼. 5분 여유로 "어제 자정 직전에 만든 task 가 자정 경계를 막 넘은 뒤 즉시 이월"
+      되는 레이스를 줄인다.
+    - Bearer 인증 헤더는 Vercel Cron 이 `CRON_SECRET` 환경변수를 자동으로 주입해주므로
+      `vercel.json` 에 별도 설정 불필요 (R1 의 `matchesCronSecret` 이 검증).
+    - 사용자 수가 늘어 이월이 느려지면 후속 튜닝으로 `functions["src/app/api/cron/rollover/route.ts"].maxDuration`
+      을 올릴 여지가 있지만, v1 규모(하루 1회 × 소규모 유저) 에서는 기본 Hobby 10s 로 충분.
+  - 테스트: 정적 설정 파일이라 별도 유닛 테스트 없음.
+    - 스키마 유효성은 `$schema` + Vercel CLI 가 배포 시 검증.
+    - 런타임 동작 검증은 아래 "완료 기준" 의 Playwright E2E 가 담당 (cron 엔드포인트를
+      Bearer 토큰과 함께 수동 호출 → DB 반영 확인).
+  - 확인 명령: `npx next lint` · `npx tsc --noEmit` (설정 파일만 추가라 영향 없음)
 
-**완료 기준**: Playwright E2E — 어제 날짜 pending task 생성 → cron 엔드포인트 수동 호출 → task가 오늘로 이동 + rollover_logs 기록 확인.
+**완료 기준**: Playwright E2E — 어제 날짜 pending task 생성 → cron 엔드포인트 수동 호출 → task가 오늘로 이동 + rollover_logs 기록 확인. ✅ 2026-04-19
+
+- 파일: `test/e2e/rollover.spec.ts` (신규),
+  `test/e2e/global-setup.ts` (신규, `.env.local` 로더 + E2E 용 `CRON_SECRET` 주입),
+  `test/e2e/helpers/env-loader.ts` (신규, dotenv 없이 최소 파서),
+  `test/e2e/helpers/rollover-fixtures.ts` (신규, 테스트 전용 유저/태스크 시드/정리 유틸),
+  `playwright.config.ts` (globalSetup 연결 + `webServer.env.CRON_SECRET` 동기화)
+- 검증 시나리오 (단일 테스트, 2.3s):
+  1. `Asia/Seoul` 유저 + `due_at=어제 10:00 KST`, `status='pending'`, `rollover_enabled=true`
+     태스크를 직접 `postgres` 클라이언트로 Supabase 에 시드.
+  2. `Authorization: Bearer $E2E_CRON_SECRET` 로 `/api/cron/rollover` 를 GET.
+     응답 `{ ok:true, rolledOver>=1, failed:0 }` 확인.
+  3. DB 재조회: `tasks.due_at` 의 KST 날짜가 오늘과 일치하고, 로컬 10:00 시간 컴포넌트가
+     보존됨을 검증 (§8-4 "시간은 유지").
+  4. `rollover_logs` 에 `(task_id, rolled_at=오늘-KST)` 정확히 1건 기록.
+  5. 멱등성: 같은 UTC 날짜 안에서 cron 을 한 번 더 호출해도 해당 태스크의 로그 수 여전히
+     1건 유지 (R3 의 `(task_id, rolled_at)` PK + `ON CONFLICT DO NOTHING` 검증).
+- 인프라 결정:
+  - `globalSetup` 이 `.env.local` 을 테스트 프로세스에 주입 → 테스트 측이 `DATABASE_URL`
+    로 Supabase 에 직접 접속해 seed/정리. 개인 `.env.local` 은 무수정.
+  - 고정 `E2E_CRON_SECRET` 을 `globalSetup` 과 `webServer.env` 양쪽에 주입 → 서버가
+    기대하는 토큰과 테스트가 보내는 토큰이 항상 동일. `.env.local` 의 실 시크릿은 덮어씀.
+  - `testMatch: /.*\.(spec|test)\.ts$/` 로 helpers/ · global-setup 이 테스트 파일로
+    오인되지 않도록 명시.
+- 확인 명령:
+  - `npx playwright test test/e2e/rollover.spec.ts` → 1 passed (2.3s)
+  - `npx playwright test` (전체 7케이스) → 7 passed (12.6s) — smoke + middleware 회귀 없음
+  - `npx tsc --noEmit` 통과 · `npx next lint` 신규 이슈 없음
 
 ---
 
@@ -461,8 +556,8 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
 |---|---|---|---|
 | 1 | 다른 user의 task 수정 차단 (403) | D2 | - [ ] |
 | 2 | Google 토큰 revoked 401 → status 전이 | G4 | - [x] |
-| 3 | Rollover cron user-level try/catch + lock | R2/R3 | - [ ] |
-| 4 | Rollover 중복 실행 방지 (rollover_logs PK) | R3 | - [ ] |
+| 3 | Rollover cron user-level try/catch + lock | R2/R3 | - [x] (R2 try/catch + R3 FOR UPDATE SKIP LOCKED) |
+| 4 | Rollover 중복 실행 방지 (rollover_logs PK) | R3 | - [x] (ON CONFLICT DO NOTHING + RETURNING 게이트) |
 | 5 | Write toggle primary calendar 가드 (v1.5) | Lane I | ⏸️ v1.5 |
 
 ---
