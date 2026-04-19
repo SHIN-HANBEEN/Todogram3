@@ -125,24 +125,25 @@ export function TaskStatusIndicator({
         /* pending: 1.5px 중립 테두리 + 호버 시 브랜드 강조 */
         status === 'pending' &&
           'border-[1.5px] border-border-primary bg-transparent' +
-            (interactive ? ' hover:border-brand-600' : ''),
+            (interactive ? ' hover:border-border-brand' : ''),
         /* in_progress: 2px 브랜드 테두리. 배경 그라디언트 + 외곽 soft ring 은 inline style.  */
-        status === 'in_progress' && 'border-2 border-brand-600',
-        /* done: 꽉 찬 브랜드 + 흰 체크 */
-        status === 'done' && 'border-2 border-brand-600 bg-brand-600 text-white',
+        status === 'in_progress' && 'border-2 border-border-brand',
+        /* done: 꽉 찬 브랜드 + 흰 체크 (다크모드: sage 명도 상승 + warm cream 체크) */
+        status === 'done' &&
+          'border-2 border-border-brand bg-bg-brand-solid text-text-primary_on-brand',
         className
       )}
       style={
         status === 'in_progress'
           ? {
               // water-level 메타포: 하단 절반만 sage 로 채워 "진행 중" 임을 직관적으로 전달.
-              // Tailwind 에 해당 그라디언트 유틸이 없어 inline 으로 지정 — 시각 표현을 최소
-              // 토큰만 써서 재현한다(var(--color-brand-600) 은 theme.css 의 sage #3a6e5b).
+              // Tailwind 에 해당 그라디언트 유틸이 없어 inline 으로 지정 — 시맨틱 토큰 사용으로
+              // 다크모드에서 sage 명도 상승을 따라간다(--color-bg-brand-solid).
               background:
-                'linear-gradient(to top, var(--color-brand-600) 50%, transparent 50%)',
+                'linear-gradient(to top, var(--color-bg-brand-solid) 50%, transparent 50%)',
               // 외곽 20% sage soft ring — 목록에서 "진행 중" row 가 한 번에 눈에 띄도록.
               boxShadow:
-                '0 0 0 1px color-mix(in srgb, var(--color-brand-600) 20%, transparent)',
+                '0 0 0 1px color-mix(in srgb, var(--color-bg-brand-solid) 20%, transparent)',
             }
           : undefined
       }

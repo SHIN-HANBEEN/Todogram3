@@ -123,21 +123,21 @@ function CompactCell({ cell, selectedDateKey, onSelectDay }: CompactCellProps) {
       className={cx(
         'flex h-12 flex-col items-center justify-center gap-[3px] rounded-lg px-0.5 py-1',
         'cursor-pointer bg-transparent transition-colors duration-120 ease-linear motion-reduce:transition-none',
-        'hover:bg-[color-mix(in_srgb,var(--color-brand-600)_6%,transparent)]',
-        'active:bg-[color-mix(in_srgb,var(--color-brand-600)_12%,transparent)]',
+        'hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_6%,transparent)]',
+        'active:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_12%,transparent)]',
         'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring',
-        /* today: sage solid bg + soft outline */
-        isToday && 'bg-brand-600 outline outline-2 outline-offset-1 outline-[color-mix(in_srgb,var(--color-brand-600)_40%,transparent)]',
+        /* today: sage solid bg + soft outline (다크에서 sage 명도 상승) */
+        isToday && 'bg-bg-brand-solid outline outline-2 outline-offset-1 outline-[color-mix(in_srgb,var(--color-bg-brand-solid)_40%,transparent)]',
         /* selected(today 아님): sage 14% tint + 1.5px sage outline */
         isSelected &&
           !isToday &&
-          'bg-[color-mix(in_srgb,var(--color-brand-600)_14%,transparent)] outline outline-[1.5px] outline-brand-600'
+          'bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_14%,transparent)] outline outline-[1.5px] outline-brand'
       )}
     >
       <span
         className={cx(
           'font-mono tabular-nums text-[12px] font-medium leading-none',
-          isToday ? 'text-white' : 'text-text-secondary'
+          isToday ? 'text-text-primary_on-brand' : 'text-text-secondary'
         )}
       >
         {dayNum}

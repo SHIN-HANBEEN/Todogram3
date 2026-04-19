@@ -147,15 +147,15 @@ function StatusSegment({
           /* pending: 중립 톤. 스워치 크기가 작아 border 명도를 약간 높여준다. */
           status === 'pending' && 'border-border-primary bg-transparent',
           /* in_progress: 브랜드 테두리 + 하단 50% 채움 (water-level) */
-          status === 'in_progress' && 'border-brand-600',
-          /* done: 꽉 찬 브랜드 */
-          status === 'done' && 'border-brand-600 bg-brand-600'
+          status === 'in_progress' && 'border-border-brand',
+          /* done: 꽉 찬 브랜드 (다크: sage 명도 상승) */
+          status === 'done' && 'border-border-brand bg-bg-brand-solid'
         )}
         style={
           status === 'in_progress'
             ? {
                 background:
-                  'linear-gradient(to top, var(--color-brand-600) 50%, transparent 50%)',
+                  'linear-gradient(to top, var(--color-bg-brand-solid) 50%, transparent 50%)',
               }
             : undefined
         }

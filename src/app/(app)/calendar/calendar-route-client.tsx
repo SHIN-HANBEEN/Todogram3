@@ -105,18 +105,15 @@ export function CalendarRouteClient({
       <h1 className="font-display text-[22px] leading-none text-text-primary">
         {monthLabel}
       </h1>
-      <nav
-        aria-label={locale === 'ko' ? '월 이동' : 'Month navigation'}
-        className="flex items-center gap-0.5"
-      >
+      <nav aria-label="월 이동" className="flex items-center gap-0.5">
         <Link
           href={prevMonthHref}
           prefetch
-          aria-label={locale === 'ko' ? '이전 달' : 'Previous month'}
+          aria-label="이전 달"
           className={cx(
             'inline-flex h-10 w-10 items-center justify-center rounded-full text-fg-secondary',
             'transition-colors duration-100 ease-linear',
-            'hover:bg-[color-mix(in_srgb,var(--color-brand-600)_6%,transparent)] hover:text-fg-primary',
+            'hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_6%,transparent)] hover:text-fg-primary',
             'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
           )}
         >
@@ -126,25 +123,25 @@ export function CalendarRouteClient({
           <Link
             href={todayHref}
             prefetch
-            aria-label={locale === 'ko' ? '오늘로 이동' : 'Jump to today'}
+            aria-label="오늘로 이동"
             className={cx(
               'inline-flex h-10 items-center rounded-full px-3 text-[13px] font-medium text-text-secondary',
               'transition-colors duration-100 ease-linear',
-              'hover:bg-[color-mix(in_srgb,var(--color-brand-600)_6%,transparent)] hover:text-text-primary',
+              'hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_6%,transparent)] hover:text-text-primary',
               'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
             )}
           >
-            {locale === 'ko' ? '오늘' : 'Today'}
+            오늘
           </Link>
         )}
         <Link
           href={nextMonthHref}
           prefetch
-          aria-label={locale === 'ko' ? '다음 달' : 'Next month'}
+          aria-label="다음 달"
           className={cx(
             'inline-flex h-10 w-10 items-center justify-center rounded-full text-fg-secondary',
             'transition-colors duration-100 ease-linear',
-            'hover:bg-[color-mix(in_srgb,var(--color-brand-600)_6%,transparent)] hover:text-fg-primary',
+            'hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_6%,transparent)] hover:text-fg-primary',
             'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
           )}
         >
@@ -166,11 +163,11 @@ export function CalendarRouteClient({
         <button
           type="button"
           onClick={onBack}
-          aria-label={locale === 'ko' ? '월 보기로 돌아가기' : 'Back to month view'}
+          aria-label="월 보기로 돌아가기"
           className={cx(
             'inline-flex h-10 items-center gap-1 rounded-full pl-2 pr-3 text-[14px] font-medium text-text-secondary',
             'transition-colors duration-100 ease-linear',
-            'hover:bg-[color-mix(in_srgb,var(--color-brand-600)_6%,transparent)] hover:text-text-primary',
+            'hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_6%,transparent)] hover:text-text-primary',
             'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus-ring'
           )}
         >
@@ -190,7 +187,7 @@ export function CalendarRouteClient({
        * lg 이상은 BottomNav 대신 SidebarNav 가 쓰이므로 전체 dvh 그대로 사용. */
       className="flex h-[calc(100dvh-72px)] min-h-0 w-full flex-col bg-bg-primary lg:h-dvh"
     >
-      {showReauthBanner && <ReauthBanner locale={locale} />}
+      {showReauthBanner && <ReauthBanner />}
       <div className="flex min-h-0 flex-1">
         <CalendarViewport
           cells={cells}
@@ -217,7 +214,7 @@ export function CalendarRouteClient({
  * 사용자가 dismiss 하지 않아도 Google 권한을 복구하면 자동 사라진다 (다음 렌더 시
  * googleAuthStatus=active 면 showReauthBanner=false).
  */
-function ReauthBanner({ locale }: { locale: 'ko' | 'en' }) {
+function ReauthBanner() {
   return (
     <div
       role="alert"
@@ -228,16 +225,14 @@ function ReauthBanner({ locale }: { locale: 'ko' | 'en' }) {
       )}
     >
       <span>
-        {locale === 'ko'
-          ? 'Google 캘린더 연동이 만료되었습니다. 외부 일정이 잠시 표시되지 않습니다.'
-          : 'Google Calendar connection expired. External events are temporarily unavailable.'}
+        Google 캘린더 연동이 만료되었습니다. 외부 일정이 잠시 표시되지 않습니다.
       </span>
       <Link
         href="/login?callbackUrl=%2Fcalendar"
         prefetch
         className="shrink-0 font-medium underline underline-offset-2 hover:no-underline"
       >
-        {locale === 'ko' ? '재로그인' : 'Sign in again'}
+        재로그인
       </Link>
     </div>
   )

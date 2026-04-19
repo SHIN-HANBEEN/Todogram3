@@ -112,12 +112,12 @@ export function CalendarDayRow({
         BORDER_L_CLASS[color],
         /* hover: sage 3% tint (외부 이벤트는 hover 없음 — cursor:default) */
         !isExt &&
-          'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-brand-600)_3%,transparent)]',
+          'cursor-pointer hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_3%,transparent)]',
         isExt && 'cursor-default',
         /* in_progress row tint — Quiet Layer 예외(명확성 우선). */
         isInProgress &&
-          'bg-[color-mix(in_srgb,var(--color-brand-600)_5%,transparent)]' +
-            ' hover:bg-[color-mix(in_srgb,var(--color-brand-600)_8%,transparent)]',
+          'bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_5%,transparent)]' +
+            ' hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_8%,transparent)]',
         pending && 'opacity-60 pointer-events-none',
         className
       )}

@@ -140,14 +140,14 @@ export function CalendarDayCell({
         'group/cell relative flex min-h-0 flex-col gap-0.5 overflow-hidden text-left',
         'border-b border-r border-border-secondary px-1 pt-[5px] pb-1',
         'cursor-pointer transition-[background-color] duration-120 ease-linear motion-reduce:transition-none',
-        /* hover: sage 4% / active: sage 8% — finalized.html 그대로 */
-        'hover:bg-[color-mix(in_srgb,var(--color-brand-600)_4%,transparent)]',
-        'active:bg-[color-mix(in_srgb,var(--color-brand-600)_8%,transparent)]',
+        /* hover: sage 4% / active: sage 8% — finalized.html 그대로 (다크: sage 명도 상승) */
+        'hover:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_4%,transparent)]',
+        'active:bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_8%,transparent)]',
         /* focus-visible: 내부 2px sage outline (approved.json) */
-        'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600 focus-visible:z-10',
+        'focus:outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand focus-visible:z-10',
         /* selected: sage 8% tint + inset 1.5px sage ring */
         isSelected &&
-          'bg-[color-mix(in_srgb,var(--color-brand-600)_8%,transparent)] shadow-[inset_0_0_0_1.5px_var(--color-brand-600)]',
+          'bg-[color-mix(in_srgb,var(--color-bg-brand-solid)_8%,transparent)] shadow-[inset_0_0_0_1.5px_var(--color-bg-brand-solid)]',
         /* 7n 번째 셀은 우측 보더 제거 (grid 마지막 열) */
         '[&:nth-child(7n)]:border-r-0',
         className
@@ -158,7 +158,7 @@ export function CalendarDayCell({
         className={cx(
           'font-mono tabular-nums leading-none pl-0.5 pt-0.5 pb-[3px] text-[12px] font-medium',
           isToday
-            ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand-600 p-0 text-white'
+            ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-bg-brand-solid p-0 text-text-primary_on-brand'
             : 'text-text-secondary'
         )}
       >

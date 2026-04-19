@@ -317,7 +317,7 @@ export function CalendarViewport({
           aria-label={locale === 'ko' ? '상태 업데이트 중' : 'Updating status'}
           className="pointer-events-none absolute inset-x-0 bottom-0 h-px overflow-hidden"
         >
-          <span className="block h-full w-full animate-pulse bg-brand-600 motion-reduce:animate-none" />
+          <span className="block h-full w-full animate-pulse bg-bg-brand-solid motion-reduce:animate-none" />
         </div>
       )}
     </div>
