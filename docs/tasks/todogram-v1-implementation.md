@@ -30,7 +30,6 @@
   - 파일: `src/db/schema/{users,labels,tasks,task_labels,rollover_logs}.ts`, `drizzle.config.ts`
   - 설계 §8-2 DDL 기반. **`users.timezone TEXT NOT NULL DEFAULT 'Asia/Seoul'` 반드시 추가** (§8-4 cron이 사용)
   - `users.google_auth_status ENUM('active','revoked','expired')` 추가 (revoked 전이용)
-  - `users.task_card_style ENUM('compact','comfortable') NOT NULL DEFAULT 'comfortable'` 추가 (Phase 4 U6 TaskCard 뷰 선택용)
   - `drizzle-kit` migration 파이프라인 구성
 - [x] **F2. Supabase 프로젝트 생성 + 연결**
   - Supabase 대시보드에서 신규 프로젝트 생성 (무료 티어, ap-northeast-2 Seoul)
@@ -274,9 +273,9 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - 파일: `src/app/(app)/list/page.tsx`, `src/components/task-list/` (`task-list-view.tsx`, `status-section.tsx`, `task-row.tsx`, `search-box.tsx`, `label-filter-rail.tsx`)
   - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/list-view-20260419/board.html`
   - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/list-view-20260419/approved.json`
-  - **전략**: 상태 필터를 섹션 구조로 승격. 3개 고정 섹션(대기 · 진행 중 · 완료), 섹션 간 드래그 = 상태 전이. 리스트 아이템은 U6 `TaskCard` 를 소비하지 않고 compact row geometry 고정(섹션이 이미 밀도 구배 제공).
+  - **전략**: 상태 필터를 섹션 구조로 승격. 3개 고정 섹션(대기 · 진행 중 · 완료), 섹션 간 드래그 = 상태 전이. 리스트 아이템은 compact row geometry 고정(섹션이 이미 밀도 구배 제공 — v1 은 단일 밀도만 지원).
   - **섹션 스펙**: 고정 순서 `pending → in_progress → done`. 기본 접힘 상태 `{pending:false, in_progress:false, done:true}`. 섹션 헤더 sticky(top: filter-rail bottom), status-dot + 한글 라벨 + 카운트(JetBrains Mono), caret rotation 180° on collapse.
-  - **Row geometry** (compact 고정, `user.taskCardStyle` 무시): `[grip 16 · check 18 · title flex · time · chip-meta]`, min-height 48px, left 3px label tick, 섹션 내부 row gap 2px, 섹션 간 gap 18px.
+  - **Row geometry** (compact 고정): `[grip 16 · check 18 · title flex · time · chip-meta]`, min-height 48px, left 3px label tick, 섹션 내부 row gap 2px, 섹션 간 gap 18px.
   - **DnD**: `@dnd-kit/sortable` + `@dnd-kit/core` 멀티 컨테이너. 같은 섹션 내 드래그 = position 재정렬, 섹션 간 드래그 = `updateTaskPosition(id, newPosition, newStatus?)` Server Action 으로 상태 전이 동시 적용. `done` 으로 이동 시 `doneAt = now()` 자동 세팅, `done` 에서 빠져나가면 `doneAt = null`.
   - **필터**: 라벨 multiselect 는 상단 sticky rail(dust-blue 는 캘린더 예약이라 제외 → 5색). 상태 필터는 UI 에서 제거됨(섹션이 대체). 라벨 + 섹션 + 검색 = **AND 합성**.
   - **검색**: title + notes ILIKE, 200ms debounce, 40px input. 검색 결과도 섹션 구조 유지(사용자 명시 요구 — "검색 결과도 대기 / 진행 중 / 완료로 구분").
@@ -390,21 +389,13 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - **접근성**: row 는 `role="listitem"` + 부모 `role="list" aria-label="오늘 할 일"`, 체크박스 `aria-checked`, FilterRail `role="tablist"` + 칩 `role="tab" aria-selected`, RolloverBanner `role="status" aria-live="polite"`.
   - **모션**: row hover 시 배경 `bg-bg-primary-hover` 150ms linear. 체크 토글 시 DESIGN.md §7 체크 완료 모션 계승. `motion-reduce:transition-none`.
   - **Open questions** (구현 중 해결): (1) week scope 시 row 에 날짜 그룹 헤더 필요? (기본 yes), (2) 외부 이벤트 long-press 시 세부 시트 vs 원본 캘린더 앱 deeplink? (v1 = 아무 것도 안 함), (3) filter=calendar 일 때 내 태스크 숨김 여부? (기본 숨김).
-- [ ] **U6. TaskCard 컴포넌트 (듀얼 뷰: compact / comfortable)** 🎨 `/design-shotgun` A+B 승인
-  - 파일: `src/components/task-card/task-card.tsx`, `task-card-compact.tsx`, `task-card-comfortable.tsx`, `index.ts`
-  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/taskcard-variants-20260416/compare.html`
-  - **Variant A — Compact (Minimal Strip)**: 카드 chrome 없음, 4px 좌측 라벨 스트립 + hairline 구분선, 행 높이 56px. 정보 밀도 최고. Things 3 / iOS 네이티브 리스트 느낌.
-  - **Variant B — Comfortable (Soft Card)**: `shadow-card` + `radius-xl(12px)` + 16px padding, 라벨칩 + due time 메타 라인 포함. Noteplan / Sunsama 차분함. **기본값(default).**
-  - **공통 props**: `task: Task & { labels: Label[] }`, `onToggle: (id, status) => void`, `onClick?: (id) => void`
-  - **공통 상태 3종**: `pending` (체크박스 빈칸) / `done` (체크박스 sage 채움 + 제목 취소선) / `rollover` (⟲ 아이콘 + "어제에서 이월" 배지, `task.rolled_from_date` 있을 때)
-  - **공통 접근성**: 카드 전체 클릭 타겟 48px 이상 (DESIGN.md §5 터치 타겟), 체크박스 `aria-checked`, role=button, 키보드 Enter/Space 토글
-  - **밀도 선택 방식**: parent가 `users.task_card_style` 값 읽어 `<TaskCard variant="compact" />` 또는 `variant="comfortable"` prop 전달. default=`'comfortable'`.
-  - **Storybook/테스트**: Vitest snapshot 각 variant × 각 상태 조합 (2 × 3 = 6개), Playwright E2E에서 밀도 토글 → 카드 렌더 변화 검증
-- [ ] **U7. Settings > 뷰 밀도 토글**
-  - 파일: `src/app/(app)/settings/view/page.tsx` (또는 기존 settings 페이지 내 섹션)
-  - UntitledUI `Toggle` 또는 `RadioButtons` (compact / comfortable)
-  - 변경 시 Server Action으로 `users.task_card_style` 업데이트 + `router.refresh()`
-  - 설정 변경 즉시 List View / Calendar View 반영 확인 (SSR 값 전달)
+> **U6 (TaskCard 듀얼 뷰) + U7 (뷰 밀도 토글) 삭제 — 2026-04-19**
+>
+> 사유: U0.7 Today View 는 "통합 row ledger" 로, U2 List View 는 "섹션 구조 + compact row 고정" 으로 확정되어
+> v1 에서 `TaskCard` 컴포넌트를 실제로 렌더할 지점이 사라짐. Calendar Screen C 는 별도 "아이템 상세"
+> 화면으로 듀얼 뷰 스펙이 아님. 따라서 U6 이 dead 가 되고, U6 의 variant 전환 스위치인 U7 도
+> 함께 dead. 관련 DB 컬럼(`users.task_card_style`) 과 ENUM 도 같이 제거함 (Phase 0 F1).
+> 밀도 선택지가 필요해지면 v1.5 에서 재도입한다.
 
 ---
 
