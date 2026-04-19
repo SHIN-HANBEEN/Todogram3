@@ -410,9 +410,15 @@ Per-skill instructions may add additional formatting rules on top of this baseli
 These rules apply to every AskUserQuestion, every response you write to the user, and every review finding. They compose with the AskUserQuestion Format section above: Format = *how* a question is structured; Writing Style = *the prose quality of the content inside it*.
 
 1. **Jargon gets a one-sentence gloss on first use per skill invocation.** Even if the user's own prompt already contained the term — users often paste jargon from someone else's plan. Gloss unconditionally on first use. No cross-invocation memory: a new skill fire is a new first-use opportunity. Example: "race condition (two things happen at the same time and step on each other)".
-2. **Frame questions in outcome terms, not implementation terms.** Bad: "Is this endpoint idempotent?" Good: "If someone double-clicks the button, is it OK for the action to run twice?" Ask the question the user would actually want to answer.
-3. **Short sentences. Concrete nouns. Active voice.** Standard advice from any good writing guide. Prefer "the cache stores the result for 60s" over "results will have been cached for a period of 60s."
-4. **Close every decision with user impact.** Connect the technical call back to who's affected. "If we skip this, your users will see a 3-second spinner on every page load." Make the user's user real.
+2. **Frame questions in outcome terms, not implementation terms.** Ask the question the user would actually want to answer. Outcome framing covers three families — match the framing to the mode:
+   - **Pain reduction** (default for diagnostic / HOLD SCOPE / rigor review): "If someone double-clicks the button, is it OK for the action to run twice?" (instead of "Is this endpoint idempotent?")
+   - **Upside / delight** (for expansion / builder / vision contexts): "When the workflow finishes, does the user see the result instantly, or are they still refreshing a dashboard?" (instead of "Should we add webhook notifications?")
+   - **Interrogative pressure** (for forcing-question / founder-challenge contexts): "Can you name the actual person whose career gets better if this ships and whose career gets worse if it doesn't?" (instead of "Who's the target user?")
+3. **Short sentences. Concrete nouns. Active voice.** Standard advice from any good writing guide. Prefer "the cache stores the result for 60s" over "results will have been cached for a period of 60s." *Exception:* stacked, multi-part questions are a legitimate forcing device — "Title? Gets them promoted? Gets them fired? Keeps them up at night?" is longer than one short sentence, and it should be, because the pressure IS in the stacking. Don't collapse a stack into a single neutral ask when the skill's posture is forcing.
+4. **Close every decision with user impact.** Connect the technical call back to who's affected. Make the user's user real. Impact has three shapes — again, match the mode:
+   - **Pain avoided:** "If we skip this, your users will see a 3-second spinner on every page load."
+   - **Capability unlocked:** "If we ship this, users get instant feedback the moment a workflow finishes — no tabs to refresh, no polling."
+   - **Consequence named** (for forcing questions): "If you can't name the person whose career this helps, you don't know who you're building for — and 'users' isn't an answer."
 5. **User-turn override.** If the user's current message says "be terse" / "no explanations" / "brutally honest, just the answer" / similar, skip this entire Writing Style block for your next response, regardless of config. User's in-turn request wins.
 6. **Glossary boundary is the curated list.** Terms below get glossed. Terms not on the list are assumed plain-English enough. If you see a term that genuinely needs glossing but isn't listed, note it (once) in your response so it can be added via PR.
 
@@ -2405,16 +2411,57 @@ already knows. A good test: would this insight save time in a future session? If
 
 ## Step 12: Version bump (auto-decide)
 
-**Idempotency check:** Before bumping, compare VERSION against the base branch.
+**Idempotency check:** Before bumping, classify the state by comparing `VERSION` against the base branch AND against `package.json`'s `version` field. Four states: FRESH (do bump), ALREADY_BUMPED (skip bump), DRIFT_STALE_PKG (sync pkg only, no re-bump), DRIFT_UNEXPECTED (stop and ask).
 
 ```bash
-BASE_VERSION=$(git show origin/<base>:VERSION 2>/dev/null || echo "0.0.0.0")
-CURRENT_VERSION=$(cat VERSION 2>/dev/null || echo "0.0.0.0")
-echo "BASE: $BASE_VERSION  HEAD: $CURRENT_VERSION"
-if [ "$CURRENT_VERSION" != "$BASE_VERSION" ]; then echo "ALREADY_BUMPED"; fi
+BASE_VERSION=$(git show origin/<base>:VERSION 2>/dev/null | tr -d '\r\n[:space:]' || echo "0.0.0.0")
+CURRENT_VERSION=$(cat VERSION 2>/dev/null | tr -d '\r\n[:space:]' || echo "0.0.0.0")
+[ -z "$BASE_VERSION" ] && BASE_VERSION="0.0.0.0"
+[ -z "$CURRENT_VERSION" ] && CURRENT_VERSION="0.0.0.0"
+PKG_VERSION=""
+PKG_EXISTS=0
+if [ -f package.json ]; then
+  PKG_EXISTS=1
+  if command -v node >/dev/null 2>&1; then
+    PKG_VERSION=$(node -e 'const p=require("./package.json");process.stdout.write(p.version||"")' 2>/dev/null)
+    PARSE_EXIT=$?
+  elif command -v bun >/dev/null 2>&1; then
+    PKG_VERSION=$(bun -e 'const p=require("./package.json");process.stdout.write(p.version||"")' 2>/dev/null)
+    PARSE_EXIT=$?
+  else
+    echo "ERROR: package.json exists but neither node nor bun is available. Install one and re-run."
+    exit 1
+  fi
+  if [ "$PARSE_EXIT" != "0" ]; then
+    echo "ERROR: package.json is not valid JSON. Fix the file before re-running /ship."
+    exit 1
+  fi
+fi
+echo "BASE: $BASE_VERSION  VERSION: $CURRENT_VERSION  package.json: ${PKG_VERSION:-<none>}"
+
+if [ "$CURRENT_VERSION" = "$BASE_VERSION" ]; then
+  if [ "$PKG_EXISTS" = "1" ] && [ -n "$PKG_VERSION" ] && [ "$PKG_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "STATE: DRIFT_UNEXPECTED"
+    echo "package.json version ($PKG_VERSION) disagrees with VERSION ($CURRENT_VERSION) while VERSION matches base."
+    echo "This looks like a manual edit to package.json bypassing /ship. Reconcile manually, then re-run."
+    exit 1
+  fi
+  echo "STATE: FRESH"
+else
+  if [ "$PKG_EXISTS" = "1" ] && [ -n "$PKG_VERSION" ] && [ "$PKG_VERSION" != "$CURRENT_VERSION" ]; then
+    echo "STATE: DRIFT_STALE_PKG"
+  else
+    echo "STATE: ALREADY_BUMPED"
+  fi
+fi
 ```
 
-If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (prior `/ship` run). Skip the bump action (do not modify VERSION), but read the current VERSION value — it is needed for CHANGELOG and PR body. Continue to the next step. Otherwise proceed with the bump.
+Read the `STATE:` line and dispatch:
+
+- **FRESH** → proceed with the bump action below (steps 1–4).
+- **ALREADY_BUMPED** → skip the bump. Reuse `CURRENT_VERSION` for CHANGELOG and PR body. Continue to the next step.
+- **DRIFT_STALE_PKG** → a prior `/ship` bumped `VERSION` but failed to update `package.json`. Run the sync-only repair block below (after step 4). Do NOT re-bump. Reuse `CURRENT_VERSION` for CHANGELOG and PR body.
+- **DRIFT_UNEXPECTED** → `/ship` has halted (exit 1). Resolve manually; /ship cannot tell which file is authoritative.
 
 1. Read the current `VERSION` file (4-digit format: `MAJOR.MINOR.PATCH.MICRO`)
 
@@ -2430,7 +2477,53 @@ If output shows `ALREADY_BUMPED`, VERSION was already bumped on this branch (pri
    - Bumping a digit resets all digits to its right to 0
    - Example: `0.19.1.0` + PATCH → `0.19.2.0`
 
-4. Write the new version to the `VERSION` file.
+4. **Validate** `NEW_VERSION` and write it to **both** `VERSION` and `package.json`. This block runs only when `STATE: FRESH`.
+
+```bash
+if ! printf '%s' "$NEW_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "ERROR: NEW_VERSION ($NEW_VERSION) does not match MAJOR.MINOR.PATCH.MICRO pattern. Aborting."
+  exit 1
+fi
+echo "$NEW_VERSION" > VERSION
+if [ -f package.json ]; then
+  if command -v node >/dev/null 2>&1; then
+    node -e 'const fs=require("fs"),p=require("./package.json");p.version=process.argv[1];fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")' "$NEW_VERSION" || {
+      echo "ERROR: failed to update package.json. VERSION was written but package.json is now stale. Fix and re-run — the new idempotency check will detect the drift."
+      exit 1
+    }
+  elif command -v bun >/dev/null 2>&1; then
+    bun -e 'const fs=require("fs"),p=require("./package.json");p.version=process.argv[1];fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")' "$NEW_VERSION" || {
+      echo "ERROR: failed to update package.json. VERSION was written but package.json is now stale."
+      exit 1
+    }
+  else
+    echo "ERROR: package.json exists but neither node nor bun is available."
+    exit 1
+  fi
+fi
+```
+
+**DRIFT_STALE_PKG repair path** — runs when idempotency reports `STATE: DRIFT_STALE_PKG`. No re-bump; sync `package.json.version` to the current `VERSION` and continue. Reuse `CURRENT_VERSION` for CHANGELOG and PR body.
+
+```bash
+REPAIR_VERSION=$(cat VERSION | tr -d '\r\n[:space:]')
+if ! printf '%s' "$REPAIR_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'; then
+  echo "ERROR: VERSION file contents ($REPAIR_VERSION) do not match MAJOR.MINOR.PATCH.MICRO pattern. Refusing to propagate invalid semver into package.json. Fix VERSION manually, then re-run /ship."
+  exit 1
+fi
+if command -v node >/dev/null 2>&1; then
+  node -e 'const fs=require("fs"),p=require("./package.json");p.version=process.argv[1];fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")' "$REPAIR_VERSION" || {
+    echo "ERROR: drift repair failed — could not update package.json."
+    exit 1
+  }
+else
+  bun -e 'const fs=require("fs"),p=require("./package.json");p.version=process.argv[1];fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")' "$REPAIR_VERSION" || {
+    echo "ERROR: drift repair failed."
+    exit 1
+  }
+fi
+echo "Drift repaired: package.json synced to $REPAIR_VERSION. No version bump performed."
+```
 
 ---
 
