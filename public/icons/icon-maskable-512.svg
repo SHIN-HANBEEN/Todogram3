@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Todogram PWA 앱 아이콘 — maskable (512×512)
+  - purpose: "maskable" — Android adaptive-icon safe zone 대응
+  - 심볼은 중앙 80% 영역 안쪽으로 축소 (안드로이드 런처가 임의 shape로 crop)
+  - 배경은 edge-to-edge sage green 으로 가득 채움 (crop 이후에도 여백 없음)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#3A6E5B"/>
+  <text
+    x="256"
+    y="334"
+    text-anchor="middle"
+    font-family="'Instrument Serif', Georgia, 'Times New Roman', serif"
+    font-size="280"
+    font-weight="400"
+    fill="#FFFFFF"
+  >T</text>
+</svg>

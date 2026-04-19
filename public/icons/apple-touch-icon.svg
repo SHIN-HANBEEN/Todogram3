@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Todogram iOS 홈 화면 아이콘 (180×180)
+  - iOS Safari "홈 화면에 추가" 시 사용. iOS 는 모서리를 자동 둥글게 mask 하므로
+    내부 rx 는 작게 잡아 iOS squircle 과 자연스럽게 겹치도록 함
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180" viewBox="0 0 180 180">
+  <rect width="180" height="180" rx="36" fill="#3A6E5B"/>
+  <text
+    x="90"
+    y="128"
+    text-anchor="middle"
+    font-family="'Instrument Serif', Georgia, 'Times New Roman', serif"
+    font-size="136"
+    font-weight="400"
+    fill="#FFFFFF"
+  >T</text>
+</svg>

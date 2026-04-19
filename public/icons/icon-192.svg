@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Todogram PWA 앱 아이콘 (192×192)
+  - 바탕: Sage Green #3A6E5B (DESIGN.md §4-1 브랜드 원색)
+  - 심볼: Instrument Serif 계열 대문자 T 워드마크
+  - purpose: "any" — 홈 화면 런처용 (safe area 강제 없음)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="40" fill="#3A6E5B"/>
+  <text
+    x="96"
+    y="136"
+    text-anchor="middle"
+    font-family="'Instrument Serif', Georgia, 'Times New Roman', serif"
+    font-size="144"
+    font-weight="400"
+    fill="#FFFFFF"
+  >T</text>
+</svg>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Todogram PWA 앱 아이콘 (512×512)
+  - 192 버전과 동일 geometry, 고해상도 런처/스토어 노출용
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="108" fill="#3A6E5B"/>
+  <text
+    x="256"
+    y="360"
+    text-anchor="middle"
+    font-family="'Instrument Serif', Georgia, 'Times New Roman', serif"
+    font-size="384"
+    font-weight="400"
+    fill="#FFFFFF"
+  >T</text>
+</svg>
