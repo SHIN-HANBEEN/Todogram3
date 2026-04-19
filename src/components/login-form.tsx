@@ -319,7 +319,7 @@ export function LoginForm({ onSubmit, redirectTo = '/today' }: LoginFormProps) {
         >
           <GoogleIcon className={styles.oauth.icon} />
           <span>
-            {oauthLoading === 'google' ? '연결 중...' : 'Continue with Google'}
+            {oauthLoading === 'google' ? '연결 중...' : 'Google로 계속하기'}
           </span>
         </button>
 
@@ -332,7 +332,7 @@ export function LoginForm({ onSubmit, redirectTo = '/today' }: LoginFormProps) {
         >
           <AppleIcon className={styles.oauth.icon} />
           <span>
-            {oauthLoading === 'apple' ? '연결 중...' : 'Continue with Apple'}
+            {oauthLoading === 'apple' ? '연결 중...' : 'Apple로 계속하기'}
           </span>
         </button>
       </section>
