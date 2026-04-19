@@ -282,14 +282,36 @@ Lane F1 (U1)과 Lane F2 (U2)는 병렬 워크트리 가능.
   - **검색**: title + notes ILIKE, 200ms debounce, 40px input. 검색 결과도 섹션 구조 유지(사용자 명시 요구 — "검색 결과도 대기 / 진행 중 / 완료로 구분").
   - **접근성**: 섹션 헤더 `role=button aria-expanded`, row `role=listitem`, check `role=checkbox aria-checked`, 섹션 간 드래그 `aria-live=polite` 상태 전이 안내.
   - **Open questions (v1 구현 중 해결)**: (a) 섹션 헤더 sticky 가 라벨 rail sticky 와 겹칠 때 z-index / offset, (b) `done` 섹션 접힘 상태 localStorage 영속 여부, (c) 검색 시 done 섹션 자동 펼침 여부, (d) 빈 섹션 표시 방식(숨김 vs "항목 없음"), (e) 섹션 간 드래그 중 다른 섹션이 접혀있을 때 UX.
-- [ ] **U3. Task 생성/편집 모달**
-  - 파일: `src/components/task-form/`
-  - React Hook Form + Zod (설계 §9 기존 스타터 활용)
-  - 필드: title, notes, location, due_at, labels[], rollover_enabled
-  - UntitledUI `Modal` + `Input` + `Select.MultiSelect` + `DatePicker`
-- [ ] **U4. Label 관리 화면**
+- [x] **U3. Task 생성/편집 모달** 🎨 `/design-shotgun` Variant A · Quiet Sheet 승인 (2026-04-19)
+  - 파일: `src/components/task-form/task-form-sheet.tsx`, `src/components/task-list/task-row.tsx` (onEdit 프로프 추가), `src/components/task-list/task-list-view.tsx` (모달 상태 통합)
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/task-form-modal-20260419/board.html`, `variant-a-long-content.html`
+  - **approved.json**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/task-form-modal-20260419/approved.json`
+  - **형태**: 모바일 = 바텀 시트 (rounded 24px 24px 0 0, `max-sm:items-end` ModalOverlay 기본 동작 활용), 데스크탑 = 중앙 모달 560px · max-height 85vh.
+  - **스크롤 정책** (2026-04-19 사용자 리파인먼트 #1): 시트 body 단일 스크롤. title·memo 는 `overflow: hidden` + JS autosize(scrollHeight) 로 내용만큼 커짐 — 각 필드 내부 스크롤 제거. chip-row(라벨) 만 예외적으로 가로 스크롤.
+  - **Title sticky 제거** (2026-04-19 사용자 리파인먼트 #2): title-wrap 은 sticky 아님 — 일반 콘텐츠처럼 body 와 함께 스크롤. 헤더(닫기/제목/저장)와 푸터(삭제)만 sticky.
+  - **필드**: title (textarea rows=1 autosize, Cmd/Ctrl+Enter 저장, softLimit 120·warn 100), memo (textarea autosize, maxLength 2000·warn 1800), labels (chip-row 토글, 최대 10개), due_at (native `<input type="datetime-local">`, 지우기 버튼), rollover_enabled (토글, 기본 true), location (인라인 텍스트, 선택).
+  - **폼 검증**: React Hook Form + Zod (`@hookform/resolvers/zod`). 로컬 폼 스키마 + Server Action 의 `createTaskInputSchema`/`updateTaskInputSchema`/`setTaskLabelsInputSchema` 이중 검증.
+  - **Server Actions**: `createTask` / `updateTask` / `deleteTask` + `setTaskLabels` (원자 교체). 저장 시 `revalidatePath` 는 서버에서, 클라이언트는 `onSaved`/`onDeleted` 로 로컬 items 즉시 병합 → 깜빡임 최소화.
+  - **키보드**: Esc = 닫기 (React Aria), Cmd/Ctrl+Enter = 저장, Cmd/Ctrl+Del = 삭제 (편집 모드).
+  - **UntitledUI Modal** (`ModalOverlay` + `Modal` + `Dialog`) 재사용 — React Aria 기반으로 포커스 트랩·aria-modal·애니메이션 기본 제공.
+  - **Row 탭 → 편집**: `TaskRow` 에 `onEdit` prop 추가. grip / checkbox 는 `data-no-edit="true"` 로 편집 오픈에서 제외 (closest 체크).
+  - **접근성**: `aria-labelledby` 헤더 제목과 연결, 닫기/저장/삭제 버튼 터치 타겟 48px 확보, 토글 `role=switch aria-checked`, prefers-reduced-motion 준수.
+  - **성공 기준**:
+    - `/list` FAB → 생성 모달 · row 탭 → 편집 모달 열림
+    - 저장·삭제 후 로컬 items 즉시 갱신 + `revalidatePath('/today'|'/list'|'/calendar')` 로 서버 상태 수렴
+    - title / memo 에 긴 내용 입력 시 필드 내부 스크롤바 없음, 시트 body 만 한 줄 스크롤
+    - title 이 스크롤 대상에 포함되어 body 와 함께 스크롤됨
+    - typecheck / build 통과 (build: `/list` 246 kB)
+- [x] **U4. Label 관리 화면** 🎨 `/design-shotgun` Variant C (Editor Sheet) 승인 — 2026-04-19
   - 파일: `src/app/(app)/settings/labels/page.tsx`
-  - CRUD UI, 색상 피커 (Google colorId 11개 고정 선택)
+  - **참조 프리뷰**: `~/.gstack/projects/SHIN-HANBEEN-Todogram3/designs/settings-labels-20260419/board.html` · approved `variant-C.html`
+  - **전략**: strip 리스트 + 풀높이 Editor Sheet. 시트 상단 LivePreviewBoard 로 4 variant LabelChip + TaskRow 미리보기 즉시 검증.
+  - **리스트**: 52px strip row — `grid-template-columns: 20px 10px 1fr auto auto` (grip / 10px dot / name / count / chevron). 캘린더 reserved sentinel (`dust-blue` / 자물쇠 "외부" 배지) 최상단 고정, 편집 차단. grip 은 v1 에서 시각 힌트만 (DnD 미연결).
+  - **에디터 시트**: `src/components/settings/label-editor-sheet.tsx` — RHF + Zod(name) · 색상은 5칸 radio grid (design slug 가 매핑되는 Google colorId 5종: Basil/Sage/Banana/Tomato/Grape). Peacock(#5A7A99)은 캘린더 reserved 와 충돌해 팔레트 제외, 나머지 5종(Lavender/Flamingo/Tangerine/Graphite/Blueberry)은 hexToLabelColor 가 매핑 못해 제외. Cmd/Ctrl+Enter 저장, Esc 닫기, 편집 모드 Sticky footer 의 삭제 버튼.
+  - **라이브 프리뷰**: `src/components/settings/live-preview-board.tsx` — dot/pill/outline/pill-dot 4변형 + TaskRow mock(좌측 3px 색 틱 + 체크원 + dot chip). 시트 최상단 배치로 "색 선택 실수" 최소화 (approved.json variant-C 선정 핵심 근거).
+  - **서버 조립**: `src/app/(app)/settings/labels/page.tsx` — `requireUserId()` → labels 전량 + task_labels GROUP BY count 집계 → reserved sentinel 삽입 → `LabelsSettingsContainer` 에 전달. Server Action (`createLabel`/`updateLabel`/`deleteLabel`) 이 `revalidatePath('/settings/labels')` 담당하므로 낙관적 업데이트 없이 닫고 수렴.
+  - **DESIGN.md Hard Rule 준수**: dust-blue 예약 · 48px 터치 타겟(색 셀 64px) · Pretendard + JetBrains Mono(숫자/헥스) · 시맨틱 토큰 only · 컨페티/사운드 없음.
+  - `npm run typecheck` 통과 · `npx eslint src/components/settings src/app/(app)/settings` 0 에러.
 - [ ] **U5. 모바일 퍼스트 레이아웃 + 네비게이션**
   - 파일: `src/app/(app)/layout.tsx`
   - **성공 기준**: 모바일에서 콘텐츠 영역 ≥ 65% (설계 §12)
