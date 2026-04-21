@@ -6,7 +6,7 @@ import { authConfig } from '@/lib/auth.config'
 // ============================================================================
 // 세션 미들웨어 + 보호 라우트 — Phase 1 A3
 // ============================================================================
-// - `/calendar`, `/list`, `/settings/*` 세 prefix 에 세션 없이 접근하면 `/login` 으로
+// - `/today`, `/calendar`, `/list`, `/settings/*` 네 prefix 에 세션 없이 접근하면 `/login` 으로
 //   리다이렉트한다. 로그인 성공 후 원래 가려던 경로로 복귀할 수 있도록 `callbackUrl` 쿼리에
 //   원본 pathname+search 를 실어 보낸다.
 // - NextAuth v5 의 Split Config 패턴(authjs.dev/guides/edge-compatibility) 을 따라,
@@ -48,5 +48,10 @@ export default auth(req => {
  *    성능 오버헤드와 Edge Runtime 번들 부담을 최소화한다.
  */
 export const config = {
-  matcher: ['/calendar/:path*', '/list/:path*', '/settings/:path*'],
+  matcher: [
+    '/today/:path*',
+    '/calendar/:path*',
+    '/list/:path*',
+    '/settings/:path*',
+  ],
 }
