@@ -48,6 +48,18 @@ export interface TodayRowProps
   label: LabelId
   /** 사용자에게 표시될 라벨 텍스트 (LabelChip 안에 들어감). ext 는 '캘린더'. */
   labelText: string
+  /**
+   * LabelChip 색상을 직접 지정하고 싶을 때 override.
+   *
+   * 배경: LABEL_COLOR_MAP 은 `calendar`/`work`/`home`/`study`/`personal` 같은
+   * 슬러그 기반 하드코딩 매핑만 보유한다. 사용자가 DB 에서 새로 만든 라벨의
+   * 숫자 id(`'42'` 등) 는 여기에 없으므로 `getLabelColor` 는 'moss' 폴백을 돌려줘
+   * 라벨이 항상 회색으로만 찍히게 된다. 서버가 이미 hex→slug 변환을 마친 경우
+   * 그 결과 slug 를 이 prop 으로 주면 정확한 색으로 렌더된다.
+   *
+   * 미지정 시에는 `getLabelColor(label)` 로 폴백(후방 호환).
+   */
+  labelColor?: LabelChipColor
   /** 체크박스 상태. ext 에서는 무시됨(항상 시각적으로 숨김). */
   completed?: boolean
   /** 체크박스 토글. mine 에서만 호출. */
@@ -138,13 +150,16 @@ export function TodayRow({
   title,
   label,
   labelText,
+  labelColor,
   completed = false,
   onToggle,
   note,
   className,
   ...props
 }: TodayRowProps) {
-  const color = getLabelColor(label)
+  /* labelColor prop 이 있으면 그걸 우선 사용 — 서버에서 이미 hex→slug 로 변환한
+   * 사용자 라벨 색을 안전하게 주입할 수 있다. 없으면 기존 슬러그 매핑 폴백. */
+  const color = labelColor ?? getLabelColor(label)
   const isExt = kind === 'ext'
   const isDone = !isExt && completed
 
@@ -268,6 +283,8 @@ export interface TodayStreamItem {
   title: string
   label: LabelId
   labelText: string
+  /** LabelChip 색상 override. 서버에서 hex→slug 로 변환한 값을 주입하면 정확한 색이 찍힌다. */
+  labelColor?: LabelChipColor
   completed?: boolean
   note?: string
 }
@@ -285,6 +302,7 @@ export function buildTodayStream(
         title={item.title}
         label={item.label}
         labelText={item.labelText}
+        labelColor={item.labelColor}
         completed={item.completed}
         note={item.note}
         onToggle={onToggle ? () => onToggle(item.id) : undefined}
